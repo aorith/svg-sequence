@@ -1,0 +1,7 @@
+text {
+  font-family: "helvetica neue", arial, sans-serif, system-ui;
+}
+
+text.seq-desc {
+  font-family: "Meslo", "JetBrains Mono", "Hack", "Menlo", monospace;
+}
