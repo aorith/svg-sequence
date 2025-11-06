@@ -242,7 +242,7 @@ func (s *Sequence) Generate() (string, error) {
 	sb.WriteString("\n")
 
 	// Definitions
-	sb.WriteString("<defs>\n<style>\n" + defaultCSS + "\n</style>\n" + defs + "\n</defs>\n")
+	sb.WriteString("<defs>\n<style>\n" + defaultCSS + "</style>\n" + defs + "</defs>\n")
 
 	// Draw actors
 	x := margin + s.distance/2
