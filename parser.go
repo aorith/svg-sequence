@@ -40,7 +40,9 @@ func GenerateFromCFG(filename string) (string, error) {
 		if ok {
 			switch key {
 			case "distance_between_actors":
-				s.SetDistance(parseIntDefault(val, 180))
+				s.SetDistance(parseIntDefault(val, defaultDistance))
+			case "step_height":
+				s.SetStepHeight(parseIntDefault(val, defaultStepHeight))
 			case "width":
 				s.SetWidth(val)
 			case "height":

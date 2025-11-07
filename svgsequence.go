@@ -19,7 +19,7 @@ var defaultCSS string
 const (
 	margin                  = 20                // left and right margins
 	defaultDistance         = 180               // default distance between actors
-	stepHeight              = 50                // height for each step
+	defaultStepHeight       = 50                // default height for each step
 	actorFontSize           = 16                // actor font size
 	dashArraySize           = actorFontSize / 2 // actor line stroke dash-array size
 	descriptionOffset       = 7                 // text description offset against the step line
@@ -64,14 +64,6 @@ type Step struct {
 	section *section
 }
 
-// getHeight returns the height of the step including the text description offset
-func (st Step) getHeight() int {
-	height := stepHeight
-	incr := len(strings.Split(st.Description, "\n")) - 1
-	height += int((descriptionOffset * descriptionOffsetFactor) * incr)
-	return height
-}
-
 type Sequence struct {
 	actors    []string
 	actorsMap map[string]*actor // map[actorName]actor
@@ -80,14 +72,16 @@ type Sequence struct {
 
 	width, height string // SVG width and height (not the viewport)
 	distance      int    // distance between actors
+	stepHeight    int    // height for each step
 }
 
 func NewSequence() *Sequence {
 	return &Sequence{
-		actorsMap: make(map[string]*actor),
-		width:     "100%",
-		height:    "100%",
-		distance:  defaultDistance,
+		actorsMap:  make(map[string]*actor),
+		width:      "100%",
+		height:     "100%",
+		distance:   defaultDistance,
+		stepHeight: defaultStepHeight,
 	}
 }
 
@@ -108,6 +102,11 @@ func (s *Sequence) SetWidth(width string) {
 // Any CSS value for size is valid, including pixels or percentages.
 func (s *Sequence) SetHeight(height string) {
 	s.height = height
+}
+
+// SetStepHeight sets the height of each step in the sequence.
+func (s *Sequence) SetStepHeight(h int) {
+	s.stepHeight = h
 }
 
 // AddActors adds the given actors to the sequence, in order
@@ -154,7 +153,7 @@ func (s *Sequence) AddStep(step Step) {
 	}
 	// take into account multiline descriptions
 	incr := len(strings.Split(step.Description, "\n")) - 1
-	y += stepHeight + float64((descriptionOffset*descriptionOffsetFactor)*incr)
+	y += float64(s.stepHeight) + float64((descriptionOffset*descriptionOffsetFactor)*incr)
 	step.y = y
 
 	// iterate over open sections to associate
@@ -289,10 +288,10 @@ func (s *Sequence) Generate() (string, error) {
 		st.x2 = tgtAct.x
 
 		if st.section != nil {
-			stHeight := st.getHeight()
+			stHeight := s.getHeight(st)
 			st.section.height += stHeight
 
-			minSecY := max(0, st.y-float64(stHeight)+stepHeight/2)
+			minSecY := max(0, st.y-float64(stHeight)+float64(s.stepHeight)/2.0)
 			if st.section.y == 0 || st.section.y > minSecY {
 				st.section.y = minSecY
 			}
@@ -360,6 +359,14 @@ func (s *Sequence) Generate() (string, error) {
 	return sb.String(), nil
 }
 
+// getHeight returns the height of the step including the text description offset
+func (s *Sequence) getHeight(st *Step) int {
+	height := s.stepHeight
+	incr := len(strings.Split(st.Description, "\n")) - 1
+	height += int((descriptionOffset * descriptionOffsetFactor) * incr)
+	return height
+}
+
 // ensureActor ensures that an actor exists
 // if it does not, the actor is appended (thus appears the last)
 func (s *Sequence) ensureActor(a string) {
@@ -410,9 +417,9 @@ func (s *Sequence) totalWidth() int {
 func (s *Sequence) totalHeight() int {
 	height := actorFontSize + 2
 	for _, st := range s.steps {
-		height += st.getHeight()
+		height += s.getHeight(st)
 	}
-	height += stepHeight / 2 // extra margin
+	height += s.stepHeight / 2 // extra margin
 	// ensure the height fits the dash-array so the sequence looks better
 	for height%dashArraySize != 0 {
 		height++
