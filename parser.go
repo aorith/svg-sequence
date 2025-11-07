@@ -75,6 +75,9 @@ func GenerateFromCFG(filename string) (string, error) {
 		case "@end":
 			s.CloseSection()
 
+		case "@closeall":
+			s.CloseAllSections()
+
 		case "@step":
 			values := parseProperty(line, property)
 			var src, tgt, desc, color string

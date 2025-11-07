@@ -74,8 +74,8 @@ func (st Step) getHeight() int {
 
 type Sequence struct {
 	actors    []string
-	actorsMap map[string]*actor   // map[actorName]actor
-	sections  map[string]*section // map[sectionName]section
+	actorsMap map[string]*actor // map[actorName]actor
+	sections  []*section
 	steps     []*Step
 
 	width, height string // SVG width and height (not the viewport)
@@ -85,7 +85,6 @@ type Sequence struct {
 func NewSequence() *Sequence {
 	return &Sequence{
 		actorsMap: make(map[string]*actor),
-		sections:  make(map[string]*section),
 		width:     "100%",
 		height:    "100%",
 		distance:  defaultDistance,
@@ -194,26 +193,44 @@ func (s *Sequence) OpenSection(name, color string) {
 		color = "#000000"
 	}
 	name = escapeXML(name)
-	s.sections[name] = &section{
+	s.sections = append(s.sections, &section{
 		name:   name,
 		color:  color,
 		height: -10, // negative margin between steps so sections dont overlap
+	})
+}
+
+// CloseSection closes the last open section
+func (s *Sequence) CloseSection() {
+	for i := len(s.sections) - 1; i >= 0; i-- {
+		sec := s.sections[i]
+		// close the last section added that has any step
+		if sec.firstStepIndex != nil && sec.lastStepIndex == nil {
+			idx := len(s.steps) - 1
+			sec.lastStepIndex = &idx
+			return
+		}
 	}
 }
 
-// CloseSection closes the open section
-func (s *Sequence) CloseSection() {
-	for name, sec := range s.sections {
-		// when closing a section, check if it had any step in it (it does
-		// if firstStep != nil) and add the lastStep
-		// otherwise delete the section as it is empty
-		if sec.firstStepIndex == nil {
-			delete(s.sections, name)
-		} else {
+// CloseAllSections closes all the sections.
+// Use only if you cannot guarantee an open/close sequence for the sections.
+func (s *Sequence) CloseAllSections() {
+	for i := len(s.sections) - 1; i >= 0; i-- {
+		sec := s.sections[i]
+		if sec.firstStepIndex != nil && sec.lastStepIndex == nil {
 			idx := len(s.steps) - 1
 			sec.lastStepIndex = &idx
 		}
 	}
+	// Delete incomplete sections
+	complete := []*section{}
+	for _, sec := range s.sections {
+		if sec.firstStepIndex != nil && sec.lastStepIndex != nil {
+			complete = append(complete, sec)
+		}
+	}
+	s.sections = complete
 }
 
 // Generate generates a new SVG sequence
@@ -361,10 +378,19 @@ func (s *Sequence) setup() error {
 		}
 	}
 
+	// Delete empty sections
+	fullSections := []*section{}
+	for _, sec := range s.sections {
+		if sec.firstStepIndex != nil {
+			fullSections = append(fullSections, sec)
+		}
+	}
+	s.sections = fullSections
+
 	// Check that all sections have been closed
-	for name, sec := range s.sections {
+	for _, sec := range s.sections {
 		if sec.lastStepIndex == nil {
-			return fmt.Errorf("found open section: %s", name)
+			return fmt.Errorf("found open section: %s", sec.name)
 		}
 	}
 
