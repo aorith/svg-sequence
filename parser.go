@@ -13,7 +13,6 @@ import (
 
 // GenerateFromCFG generates the sequence by parsing a config file
 func GenerateFromCFG(filename string) (string, error) {
-
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return "", fmt.Errorf("error reading file '%s': %v", filename, err)
@@ -22,7 +21,7 @@ func GenerateFromCFG(filename string) (string, error) {
 	r := bytes.NewReader(data)
 	scanner := bufio.NewScanner(r)
 
-	// Initialize the timeline
+	// Initialize the sequence
 	s := NewSequence()
 
 	lineNum := 0
