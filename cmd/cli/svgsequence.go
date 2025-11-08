@@ -41,7 +41,7 @@ func main() {
 	if *outputFile == "" {
 		fmt.Println(svg)
 	} else {
-		if err := os.WriteFile(*outputFile, []byte(svg), 0644); err != nil {
+		if err := os.WriteFile(*outputFile, []byte(svg), 0o644); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing output file: %v\n", err)
 			os.Exit(1)
 		}
