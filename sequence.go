@@ -190,7 +190,6 @@ func (s *Sequence) OpenSection(name, color string) {
 	if color == "" {
 		color = "#000000"
 	}
-	name = escapeXML(name)
 	s.sections = append(s.sections, &section{
 		name:   name,
 		color:  color,
@@ -445,14 +444,4 @@ func (s *Sequence) totalHeight() int {
 		height++
 	}
 	return height
-}
-
-// escapeXML escapes special XML characters
-func escapeXML(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	s = strings.ReplaceAll(s, "\"", "&quot;")
-	s = strings.ReplaceAll(s, "'", "&apos;")
-	return s
 }
