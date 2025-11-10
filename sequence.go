@@ -276,6 +276,11 @@ func (s *Sequence) Generate() (string, error) {
 			},
 		})
 
+	// Background
+	root.Elements = append(root.Elements,
+		rect{X: 0, Y: 0, Width: float64(totalWidth), Height: float64(totalHeight), Fill: "#FFFFFF"},
+	)
+
 	// Draw actors
 	x := margin + s.distance/2
 	y := actorFontSize + 2
