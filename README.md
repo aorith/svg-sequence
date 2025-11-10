@@ -8,6 +8,8 @@ Small go library and CLI tool to generate sequence diagrams in SVG format.
 
 ### As a library
 
+Check the reference [documentation](https://pkg.go.dev/github.com/aorith/svg-sequence)
+
 ```go
 package main
 

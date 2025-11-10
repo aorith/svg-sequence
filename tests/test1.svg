@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 760 496" preserveAspectRatio="xMinYMin meet">
+<defs>
+<style>
+text {
+  font-family: "helvetica neue", arial, sans-serif, system-ui;
+}
+
+text.seq-desc {
+  font-family: "Meslo", "JetBrains Mono", "Hack", "Menlo", monospace;
+}
+</style>
+<marker id="seq-dot" viewBox="0 0 10 10" markerHeight="5" markerWidth="5"  refX="5" refY="5">
+    <circle cx="5" cy="5" r="3" fill="context-fill" />
+</marker>
+<marker id="seq-arrow" viewBox="0 0 10 10" markerHeight="5" markerWidth="5" orient="auto-start-reverse" refX="5" refY="5">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="context-fill" />
+</marker>
+</defs>
+<line x1="140" y1="26" x2="140" y2="496" stroke="#CCCCCC" stroke-dasharray="8 8" stroke-width="2" />
+<text x="140" y="18" font-size="16" stroke="none" fill="#000000" text-anchor="middle">Data Owner</text>
+<line x1="380" y1="26" x2="380" y2="496" stroke="#CCCCCC" stroke-dasharray="8 8" stroke-width="2" />
+<text x="380" y="18" font-size="16" stroke="none" fill="#000000" text-anchor="middle">Smart Contract</text>
+<line x1="620" y1="26" x2="620" y2="496" stroke="#CCCCCC" stroke-dasharray="8 8" stroke-width="2" />
+<text x="620" y="18" font-size="16" stroke="none" fill="#000000" text-anchor="middle">Engineer</text>
+<rect fill="#998800" fill-opacity="0.1" height="90" width="480.000000" x="20.000000" y="43.000000" /><rect fill="none"  stroke="#998800" stroke-width="1" height="90" width="480.000000" x="20.000000" y="43.000000" /><text fill="#998800" stroke="none" font-size="10" text-anchor="middle" writing-mode="tb" transform="rotate(180,16,43)" x="20.000000" y="-2.000000">Data</text><rect fill="#008899" fill-opacity="0.1" height="240" width="480.000000" x="260.000000" y="193.000000" /><rect fill="none"  stroke="#008899" stroke-width="1" height="240" width="480.000000" x="260.000000" y="193.000000" /><text fill="#008899" stroke="none" font-size="10" text-anchor="middle" writing-mode="tb" transform="rotate(180,256,193)" x="260.000000" y="73.000000">Calculations</text><circle fill="#000000" cx="140.000000" cy="68.000000" r="4" />
+<text class="seq-desc" fill="#000000" stroke="none" font-size="10" text-anchor="middle" x="140.000000" y="61.000000">🔐 encrypt data using global key</text>
+<line marker-start="url(#seq-dot)" marker-end="url(#seq-arrow)" fill="#667777" stroke="#667777" stroke-width="2" x1="140.000000" x2="375.000000" y1="118.000000" y2="118.000000" />
+<text class="seq-desc" fill="#667777" stroke="none" font-size="10" text-anchor="middle" x="260.000000" y="111.000000">send encrypted data</text>
+<circle fill="#000000" cx="620.000000" cy="168.000000" r="4" />
+<text class="seq-desc" fill="#000000" stroke="none" font-size="10" text-anchor="middle" x="620.000000" y="161.000000">🔑 generate key pair</text>
+<line marker-start="url(#seq-dot)" marker-end="url(#seq-arrow)" fill="#000000" stroke="#000000" stroke-width="2" x1="620.000000" x2="385.000000" y1="218.000000" y2="218.000000" />
+<text class="seq-desc" fill="#000000" stroke="none" font-size="10" text-anchor="middle" x="500.000000" y="211.000000">request calculations</text>
+<circle fill="#000000" cx="380.000000" cy="268.000000" r="4" />
+<text class="seq-desc" fill="#000000" stroke="none" font-size="10" text-anchor="middle" x="380.000000" y="261.000000">process calculations against data</text>
+<line marker-start="url(#seq-dot)" marker-end="url(#seq-arrow)" fill="#000000" stroke="#000000" stroke-width="2" x1="620.000000" x2="385.000000" y1="318.000000" y2="318.000000" />
+<text class="seq-desc" fill="#000000" stroke="none" font-size="10" text-anchor="middle" x="500.000000" y="311.000000">send public key</text>
+<circle fill="#000000" cx="380.000000" cy="368.000000" r="4" />
+<text class="seq-desc" fill="#000000" stroke="none" font-size="10" text-anchor="middle" x="380.000000" y="361.000000">🔐 encrypt with engineer&apos;s public key</text>
+<line marker-start="url(#seq-dot)" marker-end="url(#seq-arrow)" fill="#000000" stroke="#000000" stroke-width="2" x1="380.000000" x2="615.000000" y1="418.000000" y2="418.000000" />
+<text class="seq-desc" fill="#000000" stroke="none" font-size="10" text-anchor="middle" x="500.000000" y="411.000000">send encrypted result</text>
+<circle fill="#000000" cx="620.000000" cy="468.000000" r="4" />
+<text class="seq-desc" fill="#000000" stroke="none" font-size="10" text-anchor="middle" x="620.000000" y="461.000000">🔓 decrypt using private key</text>
+</svg>
