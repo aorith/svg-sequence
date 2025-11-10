@@ -1,6 +1,0 @@
-<marker id="seq-dot" viewBox="0 0 10 10" markerHeight="5" markerWidth="5"  refX="5" refY="5">
-    <circle cx="5" cy="5" r="3" fill="context-fill" />
-</marker>
-<marker id="seq-arrow" viewBox="0 0 10 10" markerHeight="5" markerWidth="5" orient="auto-start-reverse" refX="5" refY="5">
-    <path d="M 0 0 L 10 5 L 0 10 z" fill="context-fill" />
-</marker>

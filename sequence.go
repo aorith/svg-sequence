@@ -4,14 +4,13 @@ package svgsequence
 
 import (
 	_ "embed"
+	"encoding/xml"
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 )
-
-//go:embed defs.xml
-var defs string
 
 //go:embed default.css
 var defaultCSS string
@@ -248,17 +247,35 @@ func (s *Sequence) Generate() (string, error) {
 	totalWidth := s.totalWidth()
 	totalHeight := s.totalHeight()
 
-	var sb strings.Builder
-
-	// SVG header
-	sb.WriteString(fmt.Sprintf(
-		`<svg xmlns="http://www.w3.org/2000/svg" width="%s" height="%s" viewBox="0 0 %d %d" preserveAspectRatio="xMinYMin meet">`,
-		s.width, s.height, totalWidth, totalHeight,
-	))
-	sb.WriteString("\n")
+	root := svg{
+		Xmlns:               "http://www.w3.org/2000/svg",
+		Width:               s.width,
+		Height:              s.height,
+		ViewBox:             fmt.Sprintf("0 0 %d %d", totalWidth, totalHeight),
+		PreserveAspectRatio: "xMinYMin meet",
+	}
 
 	// Definitions
-	sb.WriteString("<defs>\n<style>\n" + defaultCSS + "</style>\n" + defs + "</defs>\n")
+	root.Elements = append(root.Elements,
+		svgDefs{
+			Elements: []any{
+				svgStyle{Content: defaultCSS},
+
+				marker{
+					ID: "seq-dot", ViewBox: "0 0 10 10", MarkerWidth: 5, MarkerHeight: 5, RefX: 5, RefY: 5,
+					Elements: []any{
+						circle{CX: 5, CY: 5, R: 3, Fill: "context-fill"},
+					},
+				},
+
+				marker{
+					ID: "seq-arrow", ViewBox: "0 0 10 10", MarkerWidth: 5, MarkerHeight: 5, RefX: 5, RefY: 5, Orient: "auto-start-reverse",
+					Elements: []any{
+						path{D: "M 0 0 L 10 5 L 0 10 z", Fill: "context-fill"},
+					},
+				},
+			},
+		})
 
 	// Draw actors
 	x := margin + s.distance/2
@@ -266,15 +283,12 @@ func (s *Sequence) Generate() (string, error) {
 	for _, name := range s.actors {
 		a := s.actorsMap[name]
 
-		// Actor line
-		sb.WriteString(fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#CCCCCC" stroke-dasharray="%d %d" stroke-width="2" />`,
-			x, y+dashArraySize, x, totalHeight, dashArraySize, dashArraySize))
-		sb.WriteString("\n")
-
-		// Actor text
-		sb.WriteString(fmt.Sprintf(`<text x="%d" y="%d" font-size="%d"`, x, y, actorFontSize))
-		sb.WriteString(fmt.Sprintf(` stroke="none" fill="#000000" text-anchor="middle">%s</text>`, name))
-		sb.WriteString("\n")
+		root.Elements = append(root.Elements,
+			// Actor line
+			line{X1: float64(x), Y1: float64(y + dashArraySize), X2: float64(x), Y2: float64(totalHeight), Stroke: "#CCCCCC", StrokeDasharray: fmt.Sprintf("%[1]d %[1]d", dashArraySize), StrokeWidth: 2},
+			// Actor text
+			text{X: float64(x), Y: float64(y), FontSize: strconv.Itoa(actorFontSize), Stroke: "none", Fill: "#000000", TextAnchor: "middle", Content: name},
+		)
 
 		a.x = float64(x)
 		x += s.distance
@@ -315,12 +329,11 @@ func (s *Sequence) Generate() (string, error) {
 
 	// Draw sections
 	for _, sec := range s.sections {
-		sb.WriteString(fmt.Sprintf(`<rect fill="%s" fill-opacity="0.1" height="%d" width="%f" x="%f" y="%f" />`,
-			sec.color, sec.height, sec.width, sec.x, sec.y))
-		sb.WriteString(fmt.Sprintf(`<rect fill="none"  stroke="%s" stroke-width="1" height="%d" width="%f" x="%f" y="%f" />`,
-			sec.color, sec.height, sec.width, sec.x, sec.y))
-		sb.WriteString(fmt.Sprintf(`<text fill="%s" stroke="none" font-size="10" text-anchor="middle" writing-mode="tb" transform="rotate(180,%d,%d)" x="%f" y="%f">%s</text>`,
-			sec.color, int(sec.x)-4, int(sec.y), sec.x, sec.y-(float64(sec.height/2.0)), sec.name))
+		root.Elements = append(root.Elements,
+			rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: sec.color, FillOpacity: 0.1},
+			rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: "none", Stroke: sec.color, StrokeWidth: 1},
+			text{X: sec.x, Y: sec.y - (float64(sec.height / 2.0)), Transform: fmt.Sprintf("rotate(180,%d,%d)", int(sec.x-4), int(sec.y)), Fill: sec.color, Stroke: "none", FontSize: "10", TextAnchor: "middle", WritingMode: "tb", Content: sec.name},
+		)
 	}
 
 	// Draw steps
@@ -328,7 +341,9 @@ func (s *Sequence) Generate() (string, error) {
 	for _, st := range s.steps {
 		if st.x1 == st.x2 {
 			// dot
-			sb.WriteString(fmt.Sprintf(`<circle fill="%s" cx="%f" cy="%f" r="4" />`, st.Color, st.x1, st.y))
+			root.Elements = append(root.Elements,
+				circle{CX: st.x1, CY: st.y, R: 4, Fill: st.Color},
+			)
 		} else {
 			if st.x1 < st.x2 {
 				x2 = st.x2 - 5
@@ -336,10 +351,10 @@ func (s *Sequence) Generate() (string, error) {
 				x2 = st.x2 + 5
 			}
 			// arrow
-			sb.WriteString(fmt.Sprintf(`<line marker-start="url(#seq-dot)" marker-end="url(#seq-arrow)" fill="%s" stroke="%s" stroke-width="2" x1="%f" x2="%f" y1="%f" y2="%f" />`,
-				st.Color, st.Color, st.x1, x2, st.y, st.y))
+			root.Elements = append(root.Elements,
+				line{X1: st.x1, Y1: st.y, X2: x2, Y2: st.y, Fill: st.Color, Stroke: st.Color, StrokeWidth: 2, MarkerStart: "url(#seq-dot)", MarkerEnd: "url(#seq-arrow)"},
+			)
 		}
-		sb.WriteString("\n")
 
 		// description
 		if st.Description != "" {
@@ -347,15 +362,20 @@ func (s *Sequence) Generate() (string, error) {
 			offset := float64(descriptionOffset)
 			for i := len(parts) - 1; i >= 0; i-- {
 				p := parts[i]
-				sb.WriteString(fmt.Sprintf(`<text class="seq-desc" fill="%s" stroke="none" font-size="10" text-anchor="middle" x="%f" y="%f">%s</text>`,
-					st.Color, float64(st.x1+st.x2)/2, st.y-offset, escapeXML(p)))
-				sb.WriteString("\n")
+				root.Elements = append(root.Elements,
+					text{Class: "seq-desc", X: float64(st.x1+st.x2) / 2, Y: st.y - offset, Fill: st.Color, Stroke: "none", FontSize: "10", TextAnchor: "middle", Content: p},
+				)
 				offset += descriptionOffset * descriptionOffsetFactor
 			}
 		}
 	}
 
-	sb.WriteString("</svg>\n")
+	var sb strings.Builder
+	encoder := xml.NewEncoder(&sb)
+	encoder.Indent("", "  ")
+	if err := encoder.Encode(root); err != nil {
+		return "", err
+	}
 	return sb.String(), nil
 }
 
