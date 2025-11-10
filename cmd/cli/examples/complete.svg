@@ -8,6 +8,7 @@
       <path d="M 0 0 L 10 5 L 0 10 z" fill="context-fill"></path>
     </marker>
   </defs>
+  <rect x="0" y="0" width="760" height="416" fill="#FFFFFF"></rect>
   <line x1="110" y1="26" x2="110" y2="416" stroke="#CCCCCC" stroke-width="2" stroke-dasharray="8 8"></line>
   <text x="110" y="18" fill="#000000" stroke="none" font-size="16" text-anchor="middle">Client</text>
   <line x1="290" y1="26" x2="290" y2="416" stroke="#CCCCCC" stroke-width="2" stroke-dasharray="8 8"></line>
