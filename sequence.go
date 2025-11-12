@@ -69,9 +69,10 @@ type Sequence struct {
 	sections  []*section
 	steps     []*Step
 
-	width, height string // SVG width and height (not the viewport)
-	distance      int    // distance between actors
-	stepHeight    int    // height for each step
+	width, height       string // SVG width and height (not the viewport)
+	distance            int    // distance between actors
+	stepHeight          int    // height for each step
+	verticalSectionText bool   // whether to position the section text vertically at the left of each section
 }
 
 func NewSequence() *Sequence {
@@ -106,6 +107,11 @@ func (s *Sequence) SetHeight(height string) {
 // SetStepHeight sets the height of each step in the sequence.
 func (s *Sequence) SetStepHeight(h int) {
 	s.stepHeight = h
+}
+
+// SetVerticalSectionText sets the section text vertically on the left
+func (s *Sequence) SetVerticalSectionText(b bool) {
+	s.verticalSectionText = b
 }
 
 // AddActors adds the given actors to the sequence, in order
@@ -306,10 +312,10 @@ func (s *Sequence) Generate() (string, error) {
 		st.x2 = tgtAct.x
 
 		if st.section != nil {
-			stHeight := s.getHeight(st)
+			stHeight := s.getHeight(st) - 1
 			st.section.height += stHeight
 
-			minSecY := max(0, st.y-float64(stHeight)+float64(s.stepHeight)/2.0)
+			minSecY := max(0, st.y-float64(stHeight)+float64(s.stepHeight)/2.0) + 1
 			if st.section.y == 0 || st.section.y > minSecY {
 				st.section.y = minSecY
 			}
@@ -333,10 +339,15 @@ func (s *Sequence) Generate() (string, error) {
 
 	// Draw sections
 	for _, sec := range s.sections {
+		var secText *text
+		if s.verticalSectionText {
+			secText = &text{X: sec.x, Y: sec.y - (float64(sec.height / 2.0)), Transform: fmt.Sprintf("rotate(180,%d,%d)", int(sec.x-4), int(sec.y)), Fill: sec.color, Stroke: "none", FontSize: "10", TextAnchor: "middle", WritingMode: "tb", Content: sec.name}
+		} else {
+			secText = &text{X: sec.x, Y: sec.y - 2, Fill: sec.color, Stroke: "none", FontSize: "10", TextAnchor: "start", Content: sec.name}
+		}
 		root.Elements = append(root.Elements,
-			rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: sec.color, FillOpacity: 0.1},
-			rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: "none", Stroke: sec.color, StrokeWidth: 1},
-			text{X: sec.x, Y: sec.y - (float64(sec.height / 2.0)), Transform: fmt.Sprintf("rotate(180,%d,%d)", int(sec.x-4), int(sec.y)), Fill: sec.color, Stroke: "none", FontSize: "10", TextAnchor: "middle", WritingMode: "tb", Content: sec.name},
+			rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: sec.color, FillOpacity: 0.1, Stroke: sec.color, StrokeWidth: 1},
+			*secText,
 		)
 	}
 

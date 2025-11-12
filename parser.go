@@ -47,6 +47,8 @@ func GenerateFromCFG(filename string) (string, error) {
 				s.SetWidth(val)
 			case "height":
 				s.SetHeight(val)
+			case "vertical_section_text":
+				s.SetVerticalSectionText(val == "1" || val == "true" || val == "True")
 			}
 		}
 
