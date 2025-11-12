@@ -312,10 +312,10 @@ func (s *Sequence) Generate() (string, error) {
 		st.x2 = tgtAct.x
 
 		if st.section != nil {
-			stHeight := s.getHeight(st) - 1
+			stHeight := s.getHeight(st)
 			st.section.height += stHeight
 
-			minSecY := max(0, st.y-float64(stHeight)+float64(s.stepHeight)/2.0) + 1
+			minSecY := max(0, st.y-float64(stHeight)+float64(s.stepHeight)/2.0)
 			if st.section.y == 0 || st.section.y > minSecY {
 				st.section.y = minSecY
 			}
@@ -339,6 +339,13 @@ func (s *Sequence) Generate() (string, error) {
 
 	// Draw sections
 	for _, sec := range s.sections {
+		if !s.verticalSectionText {
+			// Offset the sections to make space for horizontal labels
+			sec.height -= 4
+			sec.y += 2
+			sec.x2 -= 2
+		}
+
 		var secText *text
 		if s.verticalSectionText {
 			secText = &text{X: sec.x, Y: sec.y - (float64(sec.height / 2.0)), Transform: fmt.Sprintf("rotate(180,%d,%d)", int(sec.x-4), int(sec.y)), Fill: sec.color, Stroke: "none", FontSize: "10", TextAnchor: "middle", WritingMode: "tb", Content: sec.name}
