@@ -114,8 +114,9 @@ func (s *Sequence) SetVerticalSectionText(b bool) {
 	s.verticalSectionText = b
 }
 
-// AddActors adds the given actors to the sequence, in order
-// use this to ensure the order of the actors in the sequence
+// AddActors adds the given actors to the sequence, in order.
+//
+// Use this to ensure the order of the actors in the sequence.
 func (s *Sequence) AddActors(actors ...string) {
 	// add new actors to the s.actors map and ensure that there are
 	// no duplicates in the actors input
@@ -126,20 +127,39 @@ func (s *Sequence) AddActors(actors ...string) {
 		}
 		_, ok := s.actorsMap[a]
 		if !ok {
-			newActors = append(newActors, a)
 			s.actorsMap[a] = &actor{}
+		}
+
+		if !slices.Contains(newActors, a) {
+			newActors = append(newActors, a)
 		}
 	}
 
 	// remove any actor from the existing list that is being re-added
 	remaining := []string{}
 	for _, a := range s.actors {
-		if !slices.Contains(actors, a) {
+		if !slices.Contains(newActors, a) {
 			remaining = append(remaining, a)
 		}
 	}
 
 	s.actors = append(newActors, remaining...)
+}
+
+// AppendActors ensures that an actor exists
+// if it does not, the actor is appended (thus appears the last)
+func (s *Sequence) AppendActors(actors ...string) {
+	for _, a := range actors {
+		if !slices.Contains(s.actors, a) {
+			s.actors = append(s.actors, a)
+			s.actorsMap[a] = &actor{}
+		}
+	}
+}
+
+// Actors returns the current list of actors
+func (s *Sequence) Actors() []string {
+	return s.actors
 }
 
 // AddStep adds a new step to the sequence diagram.
@@ -173,10 +193,10 @@ func (s *Sequence) AddStep(step Step) {
 	}
 
 	if step.SourceActor != "" {
-		s.ensureActor(step.SourceActor)
+		s.AppendActors(step.SourceActor)
 	}
 	if step.TargetActor != "" {
-		s.ensureActor(step.TargetActor)
+		s.AppendActors(step.TargetActor)
 	}
 
 	s.steps = append(s.steps, &step)
@@ -407,15 +427,6 @@ func (s *Sequence) getHeight(st *Step) int {
 	incr := len(strings.Split(st.Description, "\n")) - 1
 	height += int((descriptionOffset * descriptionOffsetFactor) * incr)
 	return height
-}
-
-// ensureActor ensures that an actor exists
-// if it does not, the actor is appended (thus appears the last)
-func (s *Sequence) ensureActor(a string) {
-	if !slices.Contains(s.actors, a) {
-		s.actors = append(s.actors, a)
-		s.actorsMap[a] = &actor{}
-	}
 }
 
 // setup initializes the sequence
