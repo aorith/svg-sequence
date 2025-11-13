@@ -384,7 +384,7 @@ func (s *Sequence) Generate() (string, error) {
 		if st.x1 == st.x2 {
 			// dot
 			root.Elements = append(root.Elements,
-				circle{CX: st.x1, CY: st.y, R: 4, Fill: st.Color},
+				circle{CX: st.x1, CY: st.y, R: 3, Fill: st.Color},
 			)
 		} else {
 			if st.x1 < st.x2 {
