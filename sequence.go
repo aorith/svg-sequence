@@ -41,24 +41,24 @@ type section struct {
 }
 
 type Step struct {
-	// Description: Optional text displayed above the arrow or mark.
-	Description string
+	// Text: Optional text displayed above the arrow or mark.
+	Text string
 
-	// SourceActor: Required name of the actor that initiates the action.
-	SourceActor string
+	// Source: Required name of the actor that initiates the action.
+	Source string
 
-	// TargetActor: Required name of the actor that receives the action.
+	// Target: Required name of the actor that receives the action.
 	//
 	// It can be the same as sourceActor.
-	TargetActor string
+	Target string
 
 	// Color: Optional CSS color value (e.g., "#ff0000", "red").
 	//
 	// Pass an empty string to use the default color.
 	Color string
 
-	x1      float64 // SourceActor x
-	x2      float64 // TargetActor x
+	x1      float64 // Source Actor x
+	x2      float64 // Target Actor x
 	y       float64
 	section *section
 }
@@ -177,7 +177,7 @@ func (s *Sequence) AddStep(step Step) {
 		y = actorFontSize + 2
 	}
 	// take into account multiline descriptions
-	incr := len(strings.Split(step.Description, "\n")) - 1
+	incr := len(strings.Split(step.Text, "\n")) - 1
 	y += float64(s.stepHeight) + float64((descriptionOffset*descriptionOffsetFactor)*incr)
 	step.y = y
 
@@ -192,11 +192,11 @@ func (s *Sequence) AddStep(step Step) {
 		}
 	}
 
-	if step.SourceActor != "" {
-		s.AppendActors(step.SourceActor)
+	if step.Source != "" {
+		s.AppendActors(step.Source)
 	}
-	if step.TargetActor != "" {
-		s.AppendActors(step.TargetActor)
+	if step.Target != "" {
+		s.AppendActors(step.Target)
 	}
 
 	s.steps = append(s.steps, &step)
@@ -326,8 +326,8 @@ func (s *Sequence) Generate() (string, error) {
 
 	// Compute steps and section values
 	for _, st := range s.steps {
-		srcAct := s.actorsMap[st.SourceActor]
-		tgtAct := s.actorsMap[st.TargetActor]
+		srcAct := s.actorsMap[st.Source]
+		tgtAct := s.actorsMap[st.Target]
 		st.x1 = srcAct.x
 		st.x2 = tgtAct.x
 
@@ -399,8 +399,8 @@ func (s *Sequence) Generate() (string, error) {
 		}
 
 		// description
-		if st.Description != "" {
-			parts := strings.Split(st.Description, "\n")
+		if st.Text != "" {
+			parts := strings.Split(st.Text, "\n")
 			offset := float64(descriptionOffset)
 			for i := len(parts) - 1; i >= 0; i-- {
 				p := parts[i]
@@ -424,7 +424,7 @@ func (s *Sequence) Generate() (string, error) {
 // getHeight returns the height of the step including the text description offset
 func (s *Sequence) getHeight(st *Step) int {
 	height := s.stepHeight
-	incr := len(strings.Split(st.Description, "\n")) - 1
+	incr := len(strings.Split(st.Text, "\n")) - 1
 	height += int((descriptionOffset * descriptionOffsetFactor) * incr)
 	return height
 }
@@ -433,7 +433,7 @@ func (s *Sequence) getHeight(st *Step) int {
 func (s *Sequence) setup() error {
 	// Check that all steps defined the actors
 	for i, step := range s.steps {
-		if step.SourceActor == "" || step.TargetActor == "" {
+		if step.Source == "" || step.Target == "" {
 			return fmt.Errorf("step #%d defined an actor with an empty name", i+1)
 		}
 	}

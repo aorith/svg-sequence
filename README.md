@@ -22,14 +22,14 @@ import (
 func main() {
 	s := svgsequence.NewSequence()
 
-	s.AddStep(svgsequence.Step{SourceActor: "Bob", TargetActor: "Maria", Description: "Hi! How are you doing?"})
+	s.AddStep(svgsequence.Step{Source: "Bob", Target: "Maria", Text: "Hi! How are you doing?"})
 	s.OpenSection("response", "")
 	s.AddStep(svgsequence.Step{
-		SourceActor: "Maria", TargetActor: "Maria",
-		Description: "*Thinks*\nLong time no see...",
+		Source: "Maria", Target: "Maria",
+		Text: "*Thinks*\nLong time no see...",
 		Color:       "#667777",
 	})
-	s.AddStep(svgsequence.Step{SourceActor: "Maria", TargetActor: "Bob", Description: "Fine!"})
+	s.AddStep(svgsequence.Step{Source: "Maria", Target: "Bob", Text: "Fine!"})
 	s.CloseSection()
 	svg, err := s.Generate()
 	if err != nil {

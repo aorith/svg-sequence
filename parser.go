@@ -102,9 +102,9 @@ func GenerateFromCFG(filename string) (string, error) {
 				color = values[3]
 			}
 			s.AddStep(Step{
-				Description: desc,
-				SourceActor: src,
-				TargetActor: tgt,
+				Text: desc,
+				Source: src,
+				Target: tgt,
 				Color:       color,
 			})
 
