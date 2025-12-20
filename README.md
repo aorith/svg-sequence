@@ -23,7 +23,7 @@ func main() {
 	s := svgsequence.NewSequence()
 
 	s.AddStep(svgsequence.Step{Source: "Bob", Target: "Maria", Text: "Hi! How are you doing?"})
-	s.OpenSection("response", "")
+	s.OpenSection("response", nil)
 	s.AddStep(svgsequence.Step{
 		Source: "Maria", Target: "Maria",
 		Text: "*Thinks*\nLong time no see...",

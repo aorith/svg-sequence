@@ -65,16 +65,23 @@ func GenerateFromCFG(filename string) (string, error) {
 		case "@start":
 			values := parseProperty(line, property)
 			var name, color string
+			bordered := true
 			switch len(values) {
 			case 0:
 				return "", fmt.Errorf("section needs a name at line %d", lineNum)
 			case 1:
 				name = values[0]
+			case 2:
+				name = values[0]
+				color = values[1]
 			default:
 				name = values[0]
 				color = values[1]
+				if values[2] == "false" {
+					bordered = false
+				}
 			}
-			s.OpenSection(name, color)
+			s.OpenSection(name, &SectionConfig{Color: color, WithoutBorder: !bordered})
 
 		case "@end":
 			s.CloseSection()
@@ -102,10 +109,10 @@ func GenerateFromCFG(filename string) (string, error) {
 				color = values[3]
 			}
 			s.AddStep(Step{
-				Text: desc,
+				Text:   desc,
 				Source: src,
 				Target: tgt,
-				Color:       color,
+				Color:  color,
 			})
 
 		default:

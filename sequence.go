@@ -32,6 +32,7 @@ type actor struct {
 type section struct {
 	name           string
 	color          string
+	bordered       bool
 	firstStepIndex *int
 	lastStepIndex  *int
 
@@ -202,25 +203,38 @@ func (s *Sequence) AddStep(step Step) {
 	s.steps = append(s.steps, &step)
 }
 
+// SectionConfig holds optional configuration for a section.
+type SectionConfig struct {
+	Color         string // Optional CSS color value (e.g., " #ff0000", "red").
+	WithoutBorder bool   // Section is drawn without a border.
+}
+
 // OpenSection opens a new section to the sequence diagram.
 // An open section must be closed after adding the steps which should be placed in it.
 //
 // Parameters:
-//   - name:  Required name of the section.
-//   - color: Optional CSS color value (e.g., "#ff0000", "red").
-//     Pass an empty string to use the default color.
-func (s *Sequence) OpenSection(name, color string) {
+//   - name:   Required name of the section.
+//   - config: Optional 'SectionConfig' configuration. Pass nil to use defaults.
+func (s *Sequence) OpenSection(name string, cfg *SectionConfig) {
 	if name == "" {
 		return
 	}
-	if color == "" {
-		color = "#000000"
+
+	sec := &section{
+		name:     name,
+		color:    "#000000",
+		bordered: true,
+		height:   -10, // negative margin between steps so sections dont overlap
 	}
-	s.sections = append(s.sections, &section{
-		name:   name,
-		color:  color,
-		height: -10, // negative margin between steps so sections dont overlap
-	})
+
+	if cfg != nil {
+		if cfg.Color != "" {
+			sec.color = cfg.Color
+		}
+		sec.bordered = !cfg.WithoutBorder
+	}
+
+	s.sections = append(s.sections, sec)
 }
 
 // CloseSection closes the last open section
@@ -372,10 +386,12 @@ func (s *Sequence) Generate() (string, error) {
 		} else {
 			secText = &text{X: sec.x, Y: sec.y - 2, Fill: sec.color, Stroke: "none", FontSize: "10", TextAnchor: "start", Content: sec.name}
 		}
-		root.Elements = append(root.Elements,
-			rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: sec.color, FillOpacity: 0.1, Stroke: sec.color, StrokeWidth: 1},
-			*secText,
-		)
+		secElem := rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: sec.color, FillOpacity: 0.1}
+		if sec.bordered {
+			secElem.Stroke = sec.color
+			secElem.StrokeWidth = 1
+		}
+		root.Elements = append(root.Elements, secElem, *secText)
 	}
 
 	// Draw steps
