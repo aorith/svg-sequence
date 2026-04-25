@@ -11,11 +11,11 @@ import (
 	"strings"
 )
 
-// GenerateFromCFG generates the sequence by parsing a config file
+// GenerateFromCFG generates the sequence by parsing a config file.
 func GenerateFromCFG(filename string) (string, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return "", fmt.Errorf("error reading file '%s': %v", filename, err)
+		return "", fmt.Errorf("error reading file '%s': %w", filename, err)
 	}
 
 	r := bytes.NewReader(data)
@@ -25,6 +25,7 @@ func GenerateFromCFG(filename string) (string, error) {
 	s := NewSequence()
 
 	lineNum := 0
+
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		lineNum++
@@ -36,6 +37,7 @@ func GenerateFromCFG(filename string) (string, error) {
 
 		// Sequence properties
 		key, val, ok := strings.Cut(line, "=")
+
 		key, val = strings.TrimSpace(key), strings.TrimSpace(val)
 		if ok {
 			switch key {
@@ -49,10 +51,12 @@ func GenerateFromCFG(filename string) (string, error) {
 				s.SetHeight(val)
 			case "vertical_section_text":
 				s.SetVerticalSectionText(val == "1" || val == "true" || val == "True")
+			default:
 			}
 		}
 
 		parts := strings.Split(line, " ")
+
 		property := parts[0]
 		if property[0] != '@' {
 			continue
@@ -64,8 +68,11 @@ func GenerateFromCFG(filename string) (string, error) {
 
 		case "@start":
 			values := parseProperty(line, property)
+
 			var name, color string
+
 			bordered := true
+
 			switch len(values) {
 			case 0:
 				return "", fmt.Errorf("section needs a name at line %d", lineNum)
@@ -76,11 +83,13 @@ func GenerateFromCFG(filename string) (string, error) {
 				color = values[1]
 			default:
 				name = values[0]
+
 				color = values[1]
 				if values[2] == "false" {
 					bordered = false
 				}
 			}
+
 			s.OpenSection(name, &SectionConfig{Color: color, WithoutBorder: !bordered})
 
 		case "@end":
@@ -91,7 +100,9 @@ func GenerateFromCFG(filename string) (string, error) {
 
 		case "@step":
 			values := parseProperty(line, property)
+
 			var src, tgt, desc, color string
+
 			switch len(values) {
 			case 0, 1:
 				return "", fmt.Errorf("not enough values for step at line %d", lineNum)
@@ -108,6 +119,7 @@ func GenerateFromCFG(filename string) (string, error) {
 				desc = values[2]
 				color = values[3]
 			}
+
 			s.AddStep(Step{
 				Text:   desc,
 				Source: src,
@@ -124,28 +136,32 @@ func GenerateFromCFG(filename string) (string, error) {
 }
 
 // parseIntDefault is a helper function to convert a string to int
-// returns the default value if parsing fails
+// returns the default value if parsing fails.
 func parseIntDefault(s string, def int) int {
 	n, err := strconv.Atoi(s)
 	if err != nil {
 		return def
 	}
+
 	return n
 }
 
-// parseProperty is a helper function to separate values from properties
+// parseProperty is a helper function to separate values from properties.
 func parseProperty(line, property string) []string {
 	// remove the prefix (@actors, @start, ...)
 	rest := strings.TrimPrefix(line, property)
 
 	parts := strings.Split(rest, ",")
+
 	values := make([]string, 0, len(parts))
 	for _, p := range parts {
 		trimmed := strings.TrimSpace(p)
+
 		trimmed = strings.ReplaceAll(trimmed, `\n`, "\n")
 		if trimmed != "" {
 			values = append(values, trimmed)
 		}
 	}
+
 	return values
 }

@@ -18,10 +18,10 @@ func main() {
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s -i <input.cfg> [-o <output.svg>]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Generate SVG sequence from CFG file.\n\n")
-		fmt.Fprintf(os.Stderr, "Options:\n")
+		fmt.Fprint(os.Stderr, "Generate SVG sequence from CFG file.\n\n")
+		fmt.Fprint(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nExample:\n")
+		fmt.Fprint(os.Stderr, "\nExample:\n")
 		fmt.Fprintf(os.Stderr, "  %s -i sequence.cfg -o sequence.svg\n", os.Args[0])
 	}
 
@@ -34,17 +34,20 @@ func main() {
 
 	svg, err := svgsequence.GenerateFromCFG(*inputFile)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Write output
 	if *outputFile == "" {
 		fmt.Println(svg)
 	} else {
-		if err := os.WriteFile(*outputFile, []byte(svg), 0o644); err != nil {
+		err := os.WriteFile(*outputFile, []byte(svg), 0o644)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing output file: %v\n", err)
 			os.Exit(1)
 		}
+
 		fmt.Fprintf(os.Stderr, "Sequence written to %s\n", *outputFile)
 	}
 }

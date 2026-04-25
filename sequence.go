@@ -5,9 +5,9 @@ package svgsequence
 import (
 	_ "embed"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -58,10 +58,10 @@ type Step struct {
 	// Pass an empty string to use the default color.
 	Color string
 
-	x1      float64 // Source Actor x
-	x2      float64 // Target Actor x
-	y       float64
-	section *section
+	x1       float64 // Source Actor x
+	x2       float64 // Target Actor x
+	y        float64
+	sections []*section
 }
 
 type Sequence struct {
@@ -86,7 +86,7 @@ func NewSequence() *Sequence {
 	}
 }
 
-// SetDistance sets the distance between actors
+// SetDistance sets the distance between actors.
 func (s *Sequence) SetDistance(d int) {
 	s.distance = d
 }
@@ -110,7 +110,7 @@ func (s *Sequence) SetStepHeight(h int) {
 	s.stepHeight = h
 }
 
-// SetVerticalSectionText sets the section text vertically on the left
+// SetVerticalSectionText sets the section text vertically on the left.
 func (s *Sequence) SetVerticalSectionText(b bool) {
 	s.verticalSectionText = b
 }
@@ -119,46 +119,46 @@ func (s *Sequence) SetVerticalSectionText(b bool) {
 //
 // Use this to ensure the order of the actors in the sequence.
 func (s *Sequence) AddActors(actors ...string) {
-	// add new actors to the s.actors map and ensure that there are
-	// no duplicates in the actors input
-	newActors := []string{}
+	seen := make(map[string]struct{}, len(actors))
+
+	newActors := make([]string, 0, len(actors))
 	for _, a := range actors {
 		if a == "" {
 			continue
 		}
-		_, ok := s.actorsMap[a]
-		if !ok {
+
+		if _, ok := s.actorsMap[a]; !ok {
 			s.actorsMap[a] = &actor{}
 		}
 
-		if !slices.Contains(newActors, a) {
+		if _, dup := seen[a]; !dup {
+			seen[a] = struct{}{}
 			newActors = append(newActors, a)
 		}
 	}
 
-	// remove any actor from the existing list that is being re-added
-	remaining := []string{}
+	remaining := make([]string, 0, len(s.actors))
 	for _, a := range s.actors {
-		if !slices.Contains(newActors, a) {
+		if _, inNew := seen[a]; !inNew {
 			remaining = append(remaining, a)
 		}
 	}
 
-	s.actors = append(newActors, remaining...)
+	s.actors = append(newActors, remaining...) // nolint: gocritic
 }
 
 // AppendActors ensures that an actor exists
-// if it does not, the actor is appended (thus appears the last)
+// if it does not, the actor is appended (thus appears the last).
 func (s *Sequence) AppendActors(actors ...string) {
 	for _, a := range actors {
-		if !slices.Contains(s.actors, a) {
-			s.actors = append(s.actors, a)
+		if _, ok := s.actorsMap[a]; !ok {
 			s.actorsMap[a] = &actor{}
+			s.actors = append(s.actors, a)
 		}
 	}
 }
 
-// Actors returns the current list of actors
+// Actors returns the current list of actors.
 func (s *Sequence) Actors() []string {
 	return s.actors
 }
@@ -182,20 +182,22 @@ func (s *Sequence) AddStep(step Step) {
 	y += float64(s.stepHeight) + float64((descriptionOffset*descriptionOffsetFactor)*incr)
 	step.y = y
 
-	// iterate over open sections to associate
+	// associate step with all currently open sections
 	for _, sec := range s.sections {
 		if sec.firstStepIndex == nil {
 			idx := len(s.steps)
 			sec.firstStepIndex = &idx
 		}
+
 		if sec.lastStepIndex == nil {
-			step.section = sec
+			step.sections = append(step.sections, sec)
 		}
 	}
 
 	if step.Source != "" {
 		s.AppendActors(step.Source)
 	}
+
 	if step.Target != "" {
 		s.AppendActors(step.Target)
 	}
@@ -231,13 +233,14 @@ func (s *Sequence) OpenSection(name string, cfg *SectionConfig) {
 		if cfg.Color != "" {
 			sec.color = cfg.Color
 		}
+
 		sec.bordered = !cfg.WithoutBorder
 	}
 
 	s.sections = append(s.sections, sec)
 }
 
-// CloseSection closes the last open section
+// CloseSection closes the last open section.
 func (s *Sequence) CloseSection() {
 	for i := len(s.sections) - 1; i >= 0; i-- {
 		sec := s.sections[i]
@@ -245,6 +248,7 @@ func (s *Sequence) CloseSection() {
 		if sec.firstStepIndex != nil && sec.lastStepIndex == nil {
 			idx := len(s.steps) - 1
 			sec.lastStepIndex = &idx
+
 			return
 		}
 	}
@@ -262,22 +266,26 @@ func (s *Sequence) CloseAllSections() {
 	}
 	// Delete incomplete sections
 	complete := []*section{}
+
 	for _, sec := range s.sections {
 		if sec.firstStepIndex != nil && sec.lastStepIndex != nil {
 			complete = append(complete, sec)
 		}
 	}
+
 	s.sections = complete
 }
 
-// Generate generates a new SVG sequence
+// Generate generates a new SVG sequence.
 func (s *Sequence) Generate() (string, error) {
 	if len(s.actors) == 0 {
-		return "", fmt.Errorf("sequence has no actors")
+		return "", errors.New("sequence has no actors")
 	}
+
 	if len(s.steps) == 0 {
-		return "", fmt.Errorf("sequence has no steps")
+		return "", errors.New("sequence has no steps")
 	}
+
 	err := s.setup()
 	if err != nil {
 		return "", err
@@ -287,7 +295,7 @@ func (s *Sequence) Generate() (string, error) {
 	totalHeight := s.totalHeight()
 
 	root := svg{
-		Xmlns:               "http://www.w3.org/2000/svg",
+		Xmlns:               "http://www.w3.org/2000/svg", // nolint: revive
 		Width:               s.width,
 		Height:              s.height,
 		ViewBox:             fmt.Sprintf("0 0 %d %d", totalWidth, totalHeight),
@@ -324,6 +332,7 @@ func (s *Sequence) Generate() (string, error) {
 	// Draw actors
 	x := margin + s.distance/2
 	y := actorFontSize + 2
+
 	for _, name := range s.actors {
 		a := s.actorsMap[name]
 
@@ -345,28 +354,29 @@ func (s *Sequence) Generate() (string, error) {
 		st.x1 = srcAct.x
 		st.x2 = tgtAct.x
 
-		if st.section != nil {
-			stHeight := s.getHeight(st)
-			st.section.height += stHeight
+		stHeight := s.getHeight(st)
+		minSecY := max(0, st.y-float64(stHeight)+float64(s.stepHeight)/2.0)
+		minSecX := max(1.0, min(st.x1, st.x2)-float64(s.distance/2.0))
+		maxSecX := max(st.x1, st.x2) + float64(s.distance/2.0)
 
-			minSecY := max(0, st.y-float64(stHeight)+float64(s.stepHeight)/2.0)
-			if st.section.y == 0 || st.section.y > minSecY {
-				st.section.y = minSecY
+		for _, sec := range st.sections {
+			sec.height += stHeight
+
+			if sec.y == 0 || sec.y > minSecY {
+				sec.y = minSecY
 			}
 
-			minSecX := max(1.0, min(st.x1, st.x2)-float64(s.distance/2.0))
-			if st.section.x == 0 || st.section.x > minSecX {
-				st.section.x = minSecX
+			if sec.x == 0 || sec.x > minSecX {
+				sec.x = minSecX
 			}
 
-			maxSecX := max(st.x1, st.x2) + float64(s.distance/2.0)
-			if st.section.x2 == 0 || st.section.x2 < maxSecX {
-				st.section.x2 = maxSecX
+			if sec.x2 == 0 || sec.x2 < maxSecX {
+				sec.x2 = maxSecX
 			}
 
-			sw := max(0, math.Abs(st.section.x-st.section.x2))
-			if st.section.width < sw {
-				st.section.width = sw
+			sw := max(0, math.Abs(sec.x-sec.x2))
+			if sec.width < sw {
+				sec.width = sw
 			}
 		}
 	}
@@ -386,11 +396,13 @@ func (s *Sequence) Generate() (string, error) {
 		} else {
 			secText = &text{X: sec.x, Y: sec.y - 2, Fill: sec.color, Stroke: "none", FontSize: "10", TextAnchor: "start", Content: sec.name}
 		}
+
 		secElem := rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: sec.color, FillOpacity: 0.1}
 		if sec.bordered {
 			secElem.Stroke = sec.color
 			secElem.StrokeWidth = 1
 		}
+
 		root.Elements = append(root.Elements, secElem, *secText)
 	}
 
@@ -418,6 +430,7 @@ func (s *Sequence) Generate() (string, error) {
 		if st.Text != "" {
 			parts := strings.Split(st.Text, "\n")
 			offset := float64(descriptionOffset)
+
 			for i := len(parts) - 1; i >= 0; i-- {
 				p := parts[i]
 				root.Elements = append(root.Elements,
@@ -429,23 +442,28 @@ func (s *Sequence) Generate() (string, error) {
 	}
 
 	var sb strings.Builder
+
 	encoder := xml.NewEncoder(&sb)
 	encoder.Indent("", "  ")
-	if err := encoder.Encode(root); err != nil {
+
+	err = encoder.Encode(root)
+	if err != nil {
 		return "", err
 	}
+
 	return sb.String(), nil
 }
 
-// getHeight returns the height of the step including the text description offset
+// getHeight returns the height of the step including the text description offset.
 func (s *Sequence) getHeight(st *Step) int {
 	height := s.stepHeight
 	incr := len(strings.Split(st.Text, "\n")) - 1
-	height += int((descriptionOffset * descriptionOffsetFactor) * incr)
+	height += (descriptionOffset * descriptionOffsetFactor) * incr
+
 	return height
 }
 
-// setup initializes the sequence
+// setup initializes the sequence.
 func (s *Sequence) setup() error {
 	// Check that all steps defined the actors
 	for i, step := range s.steps {
@@ -456,11 +474,13 @@ func (s *Sequence) setup() error {
 
 	// Delete empty sections
 	fullSections := []*section{}
+
 	for _, sec := range s.sections {
 		if sec.firstStepIndex != nil {
 			fullSections = append(fullSections, sec)
 		}
 	}
+
 	s.sections = fullSections
 
 	// Check that all sections have been closed
@@ -473,25 +493,23 @@ func (s *Sequence) setup() error {
 	return nil
 }
 
-// totalWidth returns the total width of the SVG
+// totalWidth returns the total width of the SVG.
 func (s *Sequence) totalWidth() int {
-	width := margin * 2
-	for range s.actorsMap {
-		width += s.distance
-	}
-	return width
+	return margin*2 + s.distance*len(s.actorsMap)
 }
 
-// totalHeight returns the total height of the SVG
+// totalHeight returns the total height of the SVG.
 func (s *Sequence) totalHeight() int {
 	height := actorFontSize + 2
 	for _, st := range s.steps {
 		height += s.getHeight(st)
 	}
+
 	height += s.stepHeight / 2 // extra margin
 	// ensure the height fits the dash-array so the sequence looks better
 	for height%dashArraySize != 0 {
 		height++
 	}
+
 	return height
 }

@@ -4,7 +4,6 @@ package svgsequence_test
 
 import (
 	_ "embed"
-	"fmt"
 	"os"
 	"testing"
 
@@ -30,9 +29,10 @@ func TestNewSequence(t *testing.T) {
 	s.CloseSection()
 	s.AddStep(svgsequence.Step{Source: "Engineer", Target: "Engineer", Text: "🔓 decrypt using private key"})
 	s.SetDistance(240)
+
 	got, err := s.Generate()
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		t.Fatal(err)
 	}
 
 	want := test1
