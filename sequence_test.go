@@ -5,6 +5,7 @@ package svgsequence_test
 import (
 	_ "embed"
 	"os"
+	"strings"
 	"testing"
 
 	svgsequence "github.com/aorith/svg-sequence"
@@ -42,5 +43,36 @@ func TestNewSequence(t *testing.T) {
 		t.Errorf(`NewSequence() failed, resulting svg files saved as "%s" and "%s"`, gotFn, wantFn)
 		_ = os.WriteFile(gotFn, []byte(got), 0o644)
 		_ = os.WriteFile(wantFn, []byte(want), 0o644)
+	}
+}
+
+func TestStepTextTruncationAndTooltip(t *testing.T) {
+	s := svgsequence.NewSequence()
+	s.SetDistance(120)
+
+	longText := "this is a very long description that will not fit"
+	s.AddStep(svgsequence.Step{Source: "A", Target: "B", Text: longText})
+	s.AddStep(svgsequence.Step{Source: "B", Target: "B", Text: "short\nmultiline text that is definitely too long to fit here"})
+	s.AddStep(svgsequence.Step{Source: "B", Target: "A", Text: "ok"})
+
+	got, err := s.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(got, "…") {
+		t.Error("expected a truncated description with an ellipsis")
+	}
+
+	if !strings.Contains(got, "<title>"+longText+"</title>") {
+		t.Errorf("expected a <title> tooltip with the full, untruncated text, got:\n%s", got)
+	}
+
+	if !strings.Contains(got, "short&#xA;multiline text that is definitely too long to fit here") {
+		t.Errorf("expected the tooltip of a multiline description to preserve its newline, got:\n%s", got)
+	}
+
+	if strings.Contains(got, "<title>ok</title>") {
+		t.Error("a description that fits should not get a tooltip")
 	}
 }

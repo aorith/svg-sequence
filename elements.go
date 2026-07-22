@@ -70,7 +70,14 @@ type text struct {
 	TextAnchor  string   `xml:"text-anchor,attr,omitempty"`
 	WritingMode string   `xml:"writing-mode,attr,omitempty"`
 	Transform   string   `xml:"transform,attr,omitempty"`
+	Title       *title   `xml:"title,omitempty"`
 	Content     string   `xml:",chardata"`
+}
+
+// title renders as a native SVG tooltip shown by the browser on mouse over.
+type title struct {
+	XMLName xml.Name `xml:"title"`
+	Content string   `xml:",chardata"`
 }
 
 type marker struct {

@@ -24,6 +24,10 @@ const (
 	dashArraySize           = actorFontSize / 2 // actor line stroke dash-array size
 	descriptionOffset       = 7                 // text description offset against the step line
 	descriptionOffsetFactor = 2                 // how much is increased the offset for each line in a multiline description
+	descriptionFontSize     = 10                // step description font size
+	monoCharWidthRatio      = 0.6               // approx glyph width as a fraction of font-size for the monospace description font
+	descriptionPadding      = 10                // horizontal padding kept clear on each side of a step description
+	ellipsis                = "…"               // appended to a step description line truncated to fit
 )
 
 type actor struct {
@@ -433,10 +437,19 @@ func (s *Sequence) Generate() (string, error) {
 			parts := strings.Split(st.Text, "\n")
 			offset := float64(descriptionOffset)
 
+			// available horizontal space before a line risks overlapping neighboring lanes
+			maxWidth := max(float64(s.distance), math.Abs(st.x2-st.x1)) - 2*descriptionPadding
+
 			for _, p := range slices.Backward(parts) {
-				root.Elements = append(root.Elements,
-					text{Class: "seq-desc", X: float64(st.x1+st.x2) / 2, Y: st.y - offset, Fill: st.Color, Stroke: "none", FontSize: "10", TextAnchor: "middle", Content: p},
-				)
+				line, truncated := truncateLine(p, maxWidth)
+
+				t := text{Class: "seq-desc", X: float64(st.x1+st.x2) / 2, Y: st.y - offset, Fill: st.Color, Stroke: "none", FontSize: strconv.Itoa(descriptionFontSize), TextAnchor: "middle", Content: line}
+				if truncated {
+					// full, untruncated text (newlines included) shown as a native tooltip on mouse over
+					t.Title = &title{Content: st.Text}
+				}
+
+				root.Elements = append(root.Elements, t)
 				offset += descriptionOffset * descriptionOffsetFactor
 			}
 		}
@@ -453,6 +466,24 @@ func (s *Sequence) Generate() (string, error) {
 	}
 
 	return sb.String(), nil
+}
+
+// truncateLine shortens a single line of step-description text so that it
+// roughly fits within maxWidth, appending an ellipsis when it does not fit.
+// It reports whether the line was truncated.
+func truncateLine(line string, maxWidth float64) (string, bool) {
+	maxChars := max(int(maxWidth/(descriptionFontSize*monoCharWidthRatio)), 1)
+
+	runes := []rune(line)
+	if len(runes) <= maxChars {
+		return line, false
+	}
+
+	if maxChars == 1 {
+		return ellipsis, true
+	}
+
+	return string(runes[:maxChars-1]) + ellipsis, true
 }
 
 // getHeight returns the height of the step including the text description offset.
