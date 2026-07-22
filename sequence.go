@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -182,16 +183,20 @@ func (s *Sequence) AddStep(step Step) {
 	y += float64(s.stepHeight) + float64((descriptionOffset*descriptionOffsetFactor)*incr)
 	step.y = y
 
-	// associate step with all currently open sections
+	// associate step with all currently open sections; closed sections must
+	// not be touched, or a section closed with no steps of its own would get
+	// a firstStepIndex stamped in from a later, unrelated step.
 	for _, sec := range s.sections {
+		if sec.lastStepIndex != nil {
+			continue
+		}
+
 		if sec.firstStepIndex == nil {
 			idx := len(s.steps)
 			sec.firstStepIndex = &idx
 		}
 
-		if sec.lastStepIndex == nil {
-			step.sections = append(step.sections, sec)
-		}
+		step.sections = append(step.sections, sec)
 	}
 
 	if step.Source != "" {
@@ -240,12 +245,10 @@ func (s *Sequence) OpenSection(name string, cfg *SectionConfig) {
 	s.sections = append(s.sections, sec)
 }
 
-// CloseSection closes the last open section.
+// CloseSection closes the last open section, whether or not it has any step.
 func (s *Sequence) CloseSection() {
-	for i := len(s.sections) - 1; i >= 0; i-- {
-		sec := s.sections[i]
-		// close the last section added that has any step
-		if sec.firstStepIndex != nil && sec.lastStepIndex == nil {
+	for _, sec := range slices.Backward(s.sections) {
+		if sec.lastStepIndex == nil {
 			idx := len(s.steps) - 1
 			sec.lastStepIndex = &idx
 
@@ -257,8 +260,7 @@ func (s *Sequence) CloseSection() {
 // CloseAllSections closes all the sections.
 // Use only if you cannot guarantee an open/close sequence for the sections.
 func (s *Sequence) CloseAllSections() {
-	for i := len(s.sections) - 1; i >= 0; i-- {
-		sec := s.sections[i]
+	for _, sec := range slices.Backward(s.sections) {
 		if sec.firstStepIndex != nil && sec.lastStepIndex == nil {
 			idx := len(s.steps) - 1
 			sec.lastStepIndex = &idx
@@ -431,8 +433,7 @@ func (s *Sequence) Generate() (string, error) {
 			parts := strings.Split(st.Text, "\n")
 			offset := float64(descriptionOffset)
 
-			for i := len(parts) - 1; i >= 0; i-- {
-				p := parts[i]
+			for _, p := range slices.Backward(parts) {
 				root.Elements = append(root.Elements,
 					text{Class: "seq-desc", X: float64(st.x1+st.x2) / 2, Y: st.y - offset, Fill: st.Color, Stroke: "none", FontSize: "10", TextAnchor: "middle", Content: p},
 				)
