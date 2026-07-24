@@ -17,17 +17,19 @@ import (
 var defaultCSS string
 
 const (
-	margin                  = 20                // left and right margins
-	defaultDistance         = 180               // default distance between actors
-	defaultStepHeight       = 50                // default height for each step
-	actorFontSize           = 16                // actor font size
-	dashArraySize           = actorFontSize / 2 // actor line stroke dash-array size
-	descriptionOffset       = 7                 // text description offset against the step line
-	descriptionOffsetFactor = 2                 // how much is increased the offset for each line in a multiline description
-	descriptionFontSize     = 10                // step description font size
-	monoCharWidthRatio      = 0.6               // approx glyph width as a fraction of font-size for the monospace description font
-	descriptionPadding      = 10                // horizontal padding kept clear on each side of a step description
-	ellipsis                = "…"               // appended to a step description line truncated to fit
+	margin                  = 20                  // left and right margins
+	defaultDistance         = 180                 // default distance between actors
+	defaultStepHeight       = 50                  // default height for each step
+	actorFontSize           = 16                  // actor font size
+	dashArraySize           = 4                   // actor line stroke dash-array size
+	lifelineStrokeWidth     = 1                   // actor line stroke width
+	descriptionOffset       = 7                   // text description offset against the step line
+	descriptionOffsetFactor = 2                   // how much is increased the offset for each line in a multiline description
+	descriptionFontSize     = 10                  // step description font size
+	sectionFontSize         = descriptionFontSize // section label font size
+	monoCharWidthRatio      = 0.6                 // approx glyph width as a fraction of font-size for the monospace description font
+	descriptionPadding      = 10                  // horizontal padding kept clear on each side of a step description
+	ellipsis                = "…"                 // appended to a step description line truncated to fit
 )
 
 type actor struct {
@@ -174,18 +176,9 @@ func (s *Sequence) AddStep(step Step) {
 		step.Color = "#000000"
 	}
 
-	var y float64
-	if len(s.steps) > 0 {
-		// start with last step 'y' value
-		y = s.steps[len(s.steps)-1].y
-	} else {
-		// first step 'y' value
-		y = actorFontSize + 2
-	}
-	// take into account multiline descriptions
-	incr := len(strings.Split(step.Text, "\n")) - 1
-	y += float64(s.stepHeight) + float64((descriptionOffset*descriptionOffsetFactor)*incr)
-	step.y = y
+	// step.y is computed later in Generate(), once the final stepHeight is
+	// known; computing it here would go stale if SetStepHeight is called
+	// again before Generate().
 
 	// associate step with all currently open sections; closed sections must
 	// not be touched, or a section closed with no steps of its own would get
@@ -344,7 +337,7 @@ func (s *Sequence) Generate() (string, error) {
 
 		root.Elements = append(root.Elements,
 			// Actor line
-			line{X1: float64(x), Y1: float64(y + dashArraySize), X2: float64(x), Y2: float64(totalHeight), Stroke: "#CCCCCC", StrokeDasharray: fmt.Sprintf("%[1]d %[1]d", dashArraySize), StrokeWidth: 2},
+			line{X1: float64(x), Y1: float64(y + dashArraySize), X2: float64(x), Y2: float64(totalHeight), Stroke: "#CCCCCC", StrokeDasharray: fmt.Sprintf("%[1]d %[1]d", dashArraySize), StrokeWidth: lifelineStrokeWidth},
 			// Actor text
 			text{X: float64(x), Y: float64(y), FontSize: strconv.Itoa(actorFontSize), Stroke: "none", Fill: "#000000", TextAnchor: "middle", Content: name},
 		)
@@ -354,6 +347,8 @@ func (s *Sequence) Generate() (string, error) {
 	}
 
 	// Compute steps and section values
+	stepY := float64(actorFontSize + 2)
+
 	for _, st := range s.steps {
 		srcAct := s.actorsMap[st.Source]
 		tgtAct := s.actorsMap[st.Target]
@@ -361,9 +356,12 @@ func (s *Sequence) Generate() (string, error) {
 		st.x2 = tgtAct.x
 
 		stHeight := s.getHeight(st)
+		stepY += float64(stHeight)
+		st.y = stepY
+
 		minSecY := max(0, st.y-float64(stHeight)+float64(s.stepHeight)/2.0)
-		minSecX := max(1.0, min(st.x1, st.x2)-float64(s.distance/2.0))
-		maxSecX := max(st.x1, st.x2) + float64(s.distance/2.0)
+		minSecX := max(1.0, min(st.x1, st.x2)-float64(s.distance)/2.0)
+		maxSecX := max(st.x1, st.x2) + float64(s.distance)/2.0
 
 		for _, sec := range st.sections {
 			sec.height += stHeight
@@ -393,14 +391,14 @@ func (s *Sequence) Generate() (string, error) {
 			// Offset the sections to make space for horizontal labels
 			sec.height -= 4
 			sec.y += 2
-			sec.x2 -= 2
+			sec.width -= 2
 		}
 
 		var secText *text
 		if s.verticalSectionText {
-			secText = &text{X: sec.x, Y: sec.y - (float64(sec.height / 2.0)), Transform: fmt.Sprintf("rotate(180,%d,%d)", int(sec.x-4), int(sec.y)), Fill: sec.color, Stroke: "none", FontSize: "10", TextAnchor: "middle", WritingMode: "tb", Content: sec.name}
+			secText = &text{X: sec.x, Y: sec.y - (float64(sec.height / 2.0)), Transform: fmt.Sprintf("rotate(180,%d,%d)", int(sec.x-4), int(sec.y)), Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "middle", WritingMode: "tb", Content: sec.name}
 		} else {
-			secText = &text{X: sec.x, Y: sec.y - 2, Fill: sec.color, Stroke: "none", FontSize: "10", TextAnchor: "start", Content: sec.name}
+			secText = &text{X: sec.x, Y: sec.y - 2, Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "start", Content: sec.name}
 		}
 
 		secElem := rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: sec.color, FillOpacity: 0.1}

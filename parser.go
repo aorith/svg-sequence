@@ -81,13 +81,15 @@ func GenerateFromCFG(filename string) (string, error) {
 			case 2:
 				name = values[0]
 				color = values[1]
-			default:
+			case 3:
 				name = values[0]
 
 				color = values[1]
 				if values[2] == "false" {
 					bordered = false
 				}
+			default:
+				return "", fmt.Errorf(`too many values for section at line %d (escape literal commas with "\,")`, lineNum)
 			}
 
 			s.OpenSection(name, &SectionConfig{Color: color, WithoutBorder: !bordered})
@@ -113,11 +115,13 @@ func GenerateFromCFG(filename string) (string, error) {
 				src = values[0]
 				tgt = values[1]
 				desc = values[2]
-			default:
+			case 4:
 				src = values[0]
 				tgt = values[1]
 				desc = values[2]
 				color = values[3]
+			default:
+				return "", fmt.Errorf(`too many values for step at line %d (escape literal commas with "\,")`, lineNum)
 			}
 
 			s.AddStep(Step{
@@ -147,9 +151,16 @@ func parseIntDefault(s string, def int) int {
 }
 
 // parseProperty is a helper function to separate values from properties.
+//
+// A literal comma can be kept inside a field (e.g. a step description) by
+// escaping it as `\,`, the same way `\n` is used for a literal newline.
 func parseProperty(line, property string) []string {
 	// remove the prefix (@actors, @start, ...)
 	rest := strings.TrimPrefix(line, property)
+
+	const commaPlaceholder = "\x00"
+
+	rest = strings.ReplaceAll(rest, `\,`, commaPlaceholder)
 
 	parts := strings.Split(rest, ",")
 
@@ -158,9 +169,16 @@ func parseProperty(line, property string) []string {
 		trimmed := strings.TrimSpace(p)
 
 		trimmed = strings.ReplaceAll(trimmed, `\n`, "\n")
-		if trimmed != "" {
-			values = append(values, trimmed)
-		}
+		trimmed = strings.ReplaceAll(trimmed, commaPlaceholder, ",")
+		values = append(values, trimmed)
+	}
+
+	// Drop a trailing empty field produced by a trailing separator with
+	// nothing after it (e.g. "@actors A, B,"). Fields left empty in the
+	// middle on purpose (e.g. "@step A, B, , red") are preserved so that
+	// positions still line up.
+	for len(values) > 0 && values[len(values)-1] == "" {
+		values = values[:len(values)-1]
 	}
 
 	return values

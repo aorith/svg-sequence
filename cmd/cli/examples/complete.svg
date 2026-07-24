@@ -9,13 +9,13 @@
     </marker>
   </defs>
   <rect x="0" y="0" width="760" height="416" fill="#FFFFFF"></rect>
-  <line x1="110" y1="26" x2="110" y2="416" stroke="#CCCCCC" stroke-width="2" stroke-dasharray="8 8"></line>
+  <line x1="110" y1="22" x2="110" y2="416" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4 4"></line>
   <text x="110" y="18" fill="#000000" stroke="none" font-size="16" text-anchor="middle">Client</text>
-  <line x1="290" y1="26" x2="290" y2="416" stroke="#CCCCCC" stroke-width="2" stroke-dasharray="8 8"></line>
+  <line x1="290" y1="22" x2="290" y2="416" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4 4"></line>
   <text x="290" y="18" fill="#000000" stroke="none" font-size="16" text-anchor="middle">Varnish</text>
-  <line x1="470" y1="26" x2="470" y2="416" stroke="#CCCCCC" stroke-width="2" stroke-dasharray="8 8"></line>
+  <line x1="470" y1="22" x2="470" y2="416" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4 4"></line>
   <text x="470" y="18" fill="#000000" stroke="none" font-size="16" text-anchor="middle">Cache</text>
-  <line x1="650" y1="26" x2="650" y2="416" stroke="#CCCCCC" stroke-width="2" stroke-dasharray="8 8"></line>
+  <line x1="650" y1="22" x2="650" y2="416" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4 4"></line>
   <text x="650" y="18" fill="#000000" stroke="none" font-size="16" text-anchor="middle">Backend</text>
   <rect x="20" y="43" width="540" height="168" fill="#AAAA00" fill-opacity="0.1" stroke="#AAAA00" stroke-width="1"></rect>
   <text x="20" y="-41" fill="#AAAA00" stroke="none" font-size="10" text-anchor="middle" writing-mode="tb" transform="rotate(180,16,43)">Request</text>
