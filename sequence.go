@@ -30,6 +30,9 @@ const (
 	monoCharWidthRatio      = 0.6                 // approx glyph width as a fraction of font-size for the monospace description font
 	descriptionPadding      = 10                  // horizontal padding kept clear on each side of a step description
 	ellipsis                = "…"                 // appended to a step description line truncated to fit
+	selfLoopRadiusX         = 9.0                 // how far a self-referencing step's loop bulges out from the lifeline
+	selfLoopRadiusY         = 6.0                 // half the vertical extent of a self-referencing step's loop
+	selfLoopStrokeWidth     = 1.5                 // stroke width of a self-referencing step's loop, thinner than a regular arrow
 )
 
 type actor struct {
@@ -310,14 +313,21 @@ func (s *Sequence) Generate() (string, error) {
 				marker{
 					ID: "seq-dot", ViewBox: "0 0 10 10", MarkerWidth: 5, MarkerHeight: 5, RefX: 5, RefY: 5,
 					Elements: []any{
-						circle{CX: 5, CY: 5, R: 3, Fill: "context-fill"},
+						circle{CX: 5, CY: 5, R: 3, Fill: "context-stroke"},
 					},
 				},
 
 				marker{
 					ID: "seq-arrow", ViewBox: "0 0 10 10", MarkerWidth: 5, MarkerHeight: 5, RefX: 5, RefY: 5, Orient: "auto-start-reverse",
 					Elements: []any{
-						path{D: "M 0 0 L 10 5 L 0 10 z", Fill: "context-fill"},
+						path{D: "M 0 0 L 10 5 L 0 10 z", Fill: "context-stroke"},
+					},
+				},
+
+				marker{
+					ID: "seq-arrow-sm", ViewBox: "0 0 10 10", MarkerWidth: 2.5, MarkerHeight: 2.5, RefX: 5, RefY: 5, Orient: "auto-start-reverse",
+					Elements: []any{
+						path{D: "M 0 0 L 10 5 L 0 10 z", Fill: "context-stroke"},
 					},
 				},
 			},
@@ -395,8 +405,10 @@ func (s *Sequence) Generate() (string, error) {
 		}
 
 		var secText *text
+
 		if s.verticalSectionText {
-			secText = &text{X: sec.x, Y: sec.y - (float64(sec.height / 2.0)), Transform: fmt.Sprintf("rotate(180,%d,%d)", int(sec.x-4), int(sec.y)), Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "middle", WritingMode: "tb", Content: sec.name}
+			labelX, labelY := sec.x-4, sec.y+float64(sec.height)/2.0
+			secText = &text{X: labelX, Y: labelY, Transform: fmt.Sprintf("rotate(-90,%d,%d)", int(labelX), int(labelY)), Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "middle", Content: sec.name}
 		} else {
 			secText = &text{X: sec.x, Y: sec.y - 2, Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "start", Content: sec.name}
 		}
@@ -414,9 +426,11 @@ func (s *Sequence) Generate() (string, error) {
 	var x2 float64
 	for _, st := range s.steps {
 		if st.x1 == st.x2 {
-			// dot
+			// self-referencing step
+			d := fmt.Sprintf("M %g %g A %g %g 0 1 1 %g %g",
+				st.x1, st.y, selfLoopRadiusX, selfLoopRadiusY, st.x1, st.y+2*selfLoopRadiusY)
 			root.Elements = append(root.Elements,
-				circle{CX: st.x1, CY: st.y, R: 3, Fill: st.Color},
+				path{D: d, Fill: "none", Stroke: st.Color, StrokeWidth: selfLoopStrokeWidth, MarkerEnd: "url(#seq-arrow-sm)"},
 			)
 		} else {
 			if st.x1 < st.x2 {
@@ -426,7 +440,7 @@ func (s *Sequence) Generate() (string, error) {
 			}
 			// arrow
 			root.Elements = append(root.Elements,
-				line{X1: st.x1, Y1: st.y, X2: x2, Y2: st.y, Fill: st.Color, Stroke: st.Color, StrokeWidth: 2, MarkerStart: "url(#seq-dot)", MarkerEnd: "url(#seq-arrow)"},
+				line{X1: st.x1, Y1: st.y, X2: x2, Y2: st.y, Stroke: st.Color, StrokeWidth: 2, MarkerStart: "url(#seq-dot)", MarkerEnd: "url(#seq-arrow)"},
 			)
 		}
 
