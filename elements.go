@@ -79,6 +79,12 @@ type title struct {
 	Content string   `xml:",chardata"`
 }
 
+type anchor struct {
+	XMLName  xml.Name `xml:"a"`
+	Href     string   `xml:"href,attr"`
+	Elements []any    `xml:",any"`
+}
+
 type marker struct {
 	XMLName      xml.Name `xml:"marker"`
 	ID           string   `xml:"id,attr,omitempty"`

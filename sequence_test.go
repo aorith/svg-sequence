@@ -76,3 +76,31 @@ func TestStepTextTruncationAndTooltip(t *testing.T) {
 		t.Error("a description that fits should not get a tooltip")
 	}
 }
+
+func TestSectionLink(t *testing.T) {
+	s := svgsequence.NewSequence()
+	s.OpenSection("with-link", &svgsequence.SectionConfig{Link: "#tx-123"})
+	s.AddStep(svgsequence.Step{Source: "A", Target: "B", Text: "step"})
+	s.CloseSection()
+	s.OpenSection("without-link", nil)
+	s.AddStep(svgsequence.Step{Source: "B", Target: "A", Text: "step"})
+	s.CloseSection()
+
+	got, err := s.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(got, `<a href="#tx-123">`) {
+		t.Errorf(`expected section label to be wrapped in <a href="#tx-123">, got:\n%s`, got)
+	}
+
+	idx := strings.Index(got, "without-link")
+	if idx == -1 {
+		t.Fatalf("section label %q not found in:\n%s", "without-link", got)
+	}
+
+	if strings.Contains(got[max(0, idx-80):idx], "<a href") {
+		t.Errorf("section without a Link should not be wrapped in <a>, got:\n%s", got)
+	}
+}

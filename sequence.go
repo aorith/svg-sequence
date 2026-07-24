@@ -43,6 +43,7 @@ type section struct {
 	name           string
 	color          string
 	bordered       bool
+	link           string
 	firstStepIndex *int
 	lastStepIndex  *int
 
@@ -214,6 +215,7 @@ func (s *Sequence) AddStep(step Step) {
 type SectionConfig struct {
 	Color         string // Optional CSS color value (e.g., " #ff0000", "red").
 	WithoutBorder bool   // Section is drawn without a border.
+	Link          string // Optional URL/fragment; wraps the section's label in an <a href="...">.
 }
 
 // OpenSection opens a new section to the sequence diagram.
@@ -240,6 +242,7 @@ func (s *Sequence) OpenSection(name string, cfg *SectionConfig) {
 		}
 
 		sec.bordered = !cfg.WithoutBorder
+		sec.link = cfg.Link
 	}
 
 	s.sections = append(s.sections, sec)
@@ -419,7 +422,11 @@ func (s *Sequence) Generate() (string, error) {
 			secElem.StrokeWidth = 1
 		}
 
-		root.Elements = append(root.Elements, secElem, *secText)
+		if sec.link != "" {
+			root.Elements = append(root.Elements, secElem, anchor{Href: sec.link, Elements: []any{*secText}})
+		} else {
+			root.Elements = append(root.Elements, secElem, *secText)
+		}
 	}
 
 	// Draw steps
