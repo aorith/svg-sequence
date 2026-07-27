@@ -5,3 +5,7 @@ text {
 text.seq-desc {
   font-family: "Meslo", "JetBrains Mono", "Hack", "Menlo", monospace;
 }
+
+text.seq-desc-no-arrow {
+  font-style: italic;
+}

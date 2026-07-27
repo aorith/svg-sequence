@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="100%" viewBox="0 0 760 416" preserveAspectRatio="xMinYMin meet">
   <defs>
-    <style>text {&#xA;  font-family: &#34;helvetica neue&#34;, arial, sans-serif, system-ui;&#xA;}&#xA;&#xA;text.seq-desc {&#xA;  font-family: &#34;Meslo&#34;, &#34;JetBrains Mono&#34;, &#34;Hack&#34;, &#34;Menlo&#34;, monospace;&#xA;}&#xA;</style>
+    <style>text {&#xA;  font-family: &#34;helvetica neue&#34;, arial, sans-serif, system-ui;&#xA;}&#xA;&#xA;text.seq-desc {&#xA;  font-family: &#34;Meslo&#34;, &#34;JetBrains Mono&#34;, &#34;Hack&#34;, &#34;Menlo&#34;, monospace;&#xA;}&#xA;&#xA;text.seq-desc-no-arrow {&#xA;  font-style: italic;&#xA;}&#xA;</style>
     <marker id="seq-dot" viewBox="0 0 10 10" markerWidth="5" markerHeight="5" refX="5" refY="5">
       <circle cx="5" cy="5" r="3" fill="context-stroke"></circle>
     </marker>

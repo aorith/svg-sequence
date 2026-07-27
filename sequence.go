@@ -33,6 +33,8 @@ const (
 	selfLoopRadiusX         = 9.0                 // how far a self-referencing step's loop bulges out from the lifeline
 	selfLoopRadiusY         = 6.0                 // half the vertical extent of a self-referencing step's loop
 	selfLoopStrokeWidth     = 1.5                 // stroke width of a self-referencing step's loop, thinner than a regular arrow
+	descClass               = "seq-desc"          // CSS class applied to every step description
+	descNoArrowClass        = "seq-desc-no-arrow" // additional CSS class applied to the description of a step with no arrow
 )
 
 type actor struct {
@@ -56,12 +58,18 @@ type Step struct {
 	// Text: Optional text displayed above the arrow or mark.
 	Text string
 
-	// Source: Required name of the actor that initiates the action.
+	// Source: Name of the actor that initiates the action.
+	//
+	// At least one of Source or Target is required. If only one is set, the
+	// step is placed on that actor's lifeline with no arrow drawn, as if
+	// Source and Target were the same actor.
 	Source string
 
-	// Target: Required name of the actor that receives the action.
+	// Target: Name of the actor that receives the action.
 	//
-	// It can be the same as sourceActor.
+	// It can be the same as Source. At least one of Source or Target is
+	// required. If only one is set, the step is placed on that actor's
+	// lifeline with no arrow drawn, as if Source and Target were the same actor.
 	Target string
 
 	// Color: Optional CSS color value (e.g., "#ff0000", "red").
@@ -73,6 +81,7 @@ type Step struct {
 	x2       float64 // Target Actor x
 	y        float64
 	sections []*section
+	noArrow  bool // true when Source or Target (not both) was left empty; text only, nothing drawn
 }
 
 type Sequence struct {
@@ -178,6 +187,18 @@ func (s *Sequence) Actors() []string {
 func (s *Sequence) AddStep(step Step) {
 	if step.Color == "" {
 		step.Color = "#000000"
+	}
+
+	// If only one of Source/Target is given, treat the step as belonging to
+	// that single actor: no arrow is drawn, only the text.
+	switch {
+	case step.Source == "" && step.Target != "":
+		step.Source = step.Target
+		step.noArrow = true
+	case step.Target == "" && step.Source != "":
+		step.Target = step.Source
+		step.noArrow = true
+	default:
 	}
 
 	// step.y is computed later in Generate(), once the final stepHeight is
@@ -431,15 +452,19 @@ func (s *Sequence) Generate() (string, error) {
 
 	// Draw steps
 	var x2 float64
+
 	for _, st := range s.steps {
-		if st.x1 == st.x2 {
+		switch {
+		case st.noArrow:
+			// only one of Source/Target was given: no arrow or loop, text only
+		case st.x1 == st.x2:
 			// self-referencing step
 			d := fmt.Sprintf("M %g %g A %g %g 0 1 1 %g %g",
 				st.x1, st.y, selfLoopRadiusX, selfLoopRadiusY, st.x1, st.y+2*selfLoopRadiusY)
 			root.Elements = append(root.Elements,
 				path{D: d, Fill: "none", Stroke: st.Color, StrokeWidth: selfLoopStrokeWidth, MarkerEnd: "url(#seq-arrow-sm)"},
 			)
-		} else {
+		default:
 			if st.x1 < st.x2 {
 				x2 = st.x2 - 5
 			} else {
@@ -459,10 +484,15 @@ func (s *Sequence) Generate() (string, error) {
 			// available horizontal space before a line risks overlapping neighboring lanes
 			maxWidth := max(float64(s.distance), math.Abs(st.x2-st.x1)) - 2*descriptionPadding
 
+			class := descClass
+			if st.noArrow {
+				class += " " + descNoArrowClass
+			}
+
 			for _, p := range slices.Backward(parts) {
 				line, truncated := truncateLine(p, maxWidth)
 
-				t := text{Class: "seq-desc", X: float64(st.x1+st.x2) / 2, Y: st.y - offset, Fill: st.Color, Stroke: "none", FontSize: strconv.Itoa(descriptionFontSize), TextAnchor: "middle", Content: line}
+				t := text{Class: class, X: float64(st.x1+st.x2) / 2, Y: st.y - offset, Fill: st.Color, Stroke: "none", FontSize: strconv.Itoa(descriptionFontSize), TextAnchor: "middle", Content: line}
 				if truncated {
 					// full, untruncated text (newlines included) shown as a native tooltip on mouse over
 					t.Title = &title{Content: st.Text}

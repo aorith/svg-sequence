@@ -77,6 +77,49 @@ func TestStepTextTruncationAndTooltip(t *testing.T) {
 	}
 }
 
+func TestStepWithOnlyOneActor(t *testing.T) {
+	s := svgsequence.NewSequence()
+	s.SetDistance(120)
+	s.AddStep(svgsequence.Step{Target: "A", Text: "note on A"}) // Source empty
+	s.AddStep(svgsequence.Step{Source: "B", Text: "note on B"}) // Target empty
+	s.AddStep(svgsequence.Step{Source: "A", Target: "B", Text: "A to B"})
+
+	got, err := s.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(got, "note on A") || !strings.Contains(got, "note on B") {
+		t.Errorf("expected both step descriptions to be rendered, got:\n%s", got)
+	}
+
+	if strings.Contains(got, `marker-end="url(#seq-arrow-sm)"`) {
+		t.Errorf("a step with only one actor set must not draw a self-loop, got:\n%s", got)
+	}
+
+	if strings.Count(got, `url(#seq-arrow)`) != 1 {
+		t.Errorf("expected exactly one regular arrow (for the A to B step), got:\n%s", got)
+	}
+
+	if strings.Count(got, `class="seq-desc seq-desc-no-arrow"`) != 2 {
+		t.Errorf(`expected the two single-actor steps to carry both "seq-desc" and "seq-desc-no-arrow" classes, got:\n%s`, got)
+	}
+
+	if !strings.Contains(got, `class="seq-desc"`) {
+		t.Errorf(`expected the regular A to B step to keep the plain "seq-desc" class, got:\n%s`, got)
+	}
+}
+
+func TestStepWithBothActorsEmpty(t *testing.T) {
+	s := svgsequence.NewSequence()
+	s.AddStep(svgsequence.Step{Text: "orphan step"})
+
+	_, err := s.Generate()
+	if err == nil {
+		t.Error("expected an error when both Source and Target are empty")
+	}
+}
+
 func TestSectionLink(t *testing.T) {
 	s := svgsequence.NewSequence()
 	s.OpenSection("with-link", &svgsequence.SectionConfig{Link: "#tx-123"})
