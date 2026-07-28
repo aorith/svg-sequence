@@ -5,6 +5,8 @@ package svgsequence_test
 import (
 	_ "embed"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -55,6 +57,7 @@ func TestNewSequence2(t *testing.T) {
 	s.SetWidth("1280px")
 	s.AddActors("Me", "Coworker", "Boss")
 	s.OpenSection("Work", &svgsequence.SectionConfig{Color: "#339922", WithoutBorder: false})
+	s.AddStep(svgsequence.Step{Source: "Me", Text: "aaaaaaaaaaaa"})
 	s.AddStep(svgsequence.Step{Source: "Me", Target: "Boss", Text: "click clack cluck"})
 	s.AddStep(svgsequence.Step{Source: "Me", Text: "zzZzz"})
 	s.AddStep(svgsequence.Step{Source: "Me", Text: "ZzZzz"})
@@ -183,5 +186,45 @@ func TestSectionLink(t *testing.T) {
 
 	if strings.Contains(got[max(0, idx-80):idx], "<a href") {
 		t.Errorf("section without a Link should not be wrapped in <a>, got:\n%s", got)
+	}
+}
+
+// TestSectionBottomDoesNotOverlapFollowingStep guards against the section's
+// bottom edge being derived from its last member's own height. That height
+// only matches the true gap to whatever comes next when the two happen to
+// have equal height (true for every other test in this file); here the
+// section's last member has multiline text (taller than a plain step) and
+// is immediately followed by a no-arrow step (half height), so the two
+// diverge and the section box must still stop above the following text.
+func TestSectionBottomDoesNotOverlapFollowingStep(t *testing.T) {
+	s := svgsequence.NewSequence()
+	s.OpenSection("Sec", nil)
+	s.AddStep(svgsequence.Step{Source: "A", Target: "B", Text: "line one\nline two"})
+	s.CloseSection()
+	s.AddStep(svgsequence.Step{Source: "A", Text: "note"})
+
+	got, err := s.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sectionRect := regexp.MustCompile(`<rect x="[0-9.]+" y="([0-9.]+)" width="[0-9.]+" height="([0-9.]+)"[^>]*></rect>\s*<text[^>]*>Sec</text>`).FindStringSubmatch(got)
+	if sectionRect == nil {
+		t.Fatalf("could not find the \"Sec\" section's rect in:\n%s", got)
+	}
+
+	noteText := regexp.MustCompile(`<text class="seq-desc seq-desc-no-arrow" x="[0-9.]+" y="([0-9.]+)"[^>]*>note</text>`).FindStringSubmatch(got)
+	if noteText == nil {
+		t.Fatalf("could not find the \"note\" step's text in:\n%s", got)
+	}
+
+	secY, _ := strconv.ParseFloat(sectionRect[1], 64)
+	secHeight, _ := strconv.ParseFloat(sectionRect[2], 64)
+	secBottom := secY + secHeight
+
+	noteY, _ := strconv.ParseFloat(noteText[1], 64)
+
+	if secBottom > noteY {
+		t.Errorf("section %q bottom edge (y=%v) overlaps the following step's text (y=%v), got:\n%s", "Sec", secBottom, noteY, got)
 	}
 }

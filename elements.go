@@ -8,8 +8,6 @@ import (
 
 type svg struct {
 	XMLName             xml.Name `xml:"svg"`
-	ID                  string   `xml:"id,attr,omitempty"`
-	Class               string   `xml:"class,attr,omitempty"`
 	Xmlns               string   `xml:"xmlns,attr"`
 	Width               string   `xml:"width,attr"`
 	Height              string   `xml:"height,attr"`
@@ -30,8 +28,6 @@ type svgStyle struct {
 
 type rect struct {
 	XMLName     xml.Name `xml:"rect"`
-	ID          string   `xml:"id,attr,omitempty"`
-	Class       string   `xml:"class,attr,omitempty"`
 	X           float64  `xml:"x,attr"`
 	Y           float64  `xml:"y,attr"`
 	Width       float64  `xml:"width,attr"`
@@ -44,8 +40,6 @@ type rect struct {
 
 type line struct {
 	XMLName         xml.Name `xml:"line"`
-	ID              string   `xml:"id,attr,omitempty"`
-	Class           string   `xml:"class,attr,omitempty"`
 	X1              float64  `xml:"x1,attr"`
 	Y1              float64  `xml:"y1,attr"`
 	X2              float64  `xml:"x2,attr"`
@@ -60,7 +54,6 @@ type line struct {
 
 type text struct {
 	XMLName    xml.Name `xml:"text"`
-	ID         string   `xml:"id,attr,omitempty"`
 	Class      string   `xml:"class,attr,omitempty"`
 	X          float64  `xml:"x,attr"`
 	Y          float64  `xml:"y,attr"`
@@ -88,7 +81,6 @@ type anchor struct {
 type marker struct {
 	XMLName      xml.Name `xml:"marker"`
 	ID           string   `xml:"id,attr,omitempty"`
-	Class        string   `xml:"class,attr,omitempty"`
 	ViewBox      string   `xml:"viewBox,attr"`
 	MarkerWidth  float64  `xml:"markerWidth,attr,omitempty"`
 	MarkerHeight float64  `xml:"markerHeight,attr,omitempty"`
@@ -100,8 +92,6 @@ type marker struct {
 
 type path struct {
 	XMLName     xml.Name `xml:"path"`
-	ID          string   `xml:"id,attr,omitempty"`
-	Class       string   `xml:"class,attr,omitempty"`
 	D           string   `xml:"d,attr"`
 	Fill        string   `xml:"fill,attr,omitempty"`
 	Stroke      string   `xml:"stroke,attr,omitempty"`
@@ -112,8 +102,6 @@ type path struct {
 
 type circle struct {
 	XMLName xml.Name `xml:"circle"`
-	ID      string   `xml:"id,attr,omitempty"`
-	Class   string   `xml:"class,attr,omitempty"`
 	CX      float64  `xml:"cx,attr"`
 	CY      float64  `xml:"cy,attr"`
 	R       int      `xml:"r,attr"`

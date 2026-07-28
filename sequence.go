@@ -35,6 +35,8 @@ const (
 	selfLoopStrokeWidth     = 1.5                 // stroke width of a self-referencing step's loop, thinner than a regular arrow
 	descClass               = "seq-desc"          // CSS class applied to every step description
 	descNoArrowClass        = "seq-desc-no-arrow" // additional CSS class applied to the description of a step with no arrow
+	sectionBottomMargin     = 10                  // vertical clearance trimmed from a section's bottom edge so consecutive sections don't visually touch
+	sectionTopClearance     = 10                  // minimum vertical room reserved between a section's label and its first member's own topmost text
 )
 
 type actor struct {
@@ -42,16 +44,15 @@ type actor struct {
 }
 
 type section struct {
-	name           string
-	color          string
-	bordered       bool
-	link           string
-	firstStepIndex *int
-	lastStepIndex  *int
+	name     string
+	color    string
+	bordered bool
+	link     string
+	hasSteps bool // true once at least one step has been associated with the section
+	closed   bool // true once CloseSection/CloseAllSections has closed the section
 
-	x, x2, y float64
-	width    float64
-	height   int
+	x, x2, y, yBottom float64
+	width             float64
 }
 
 type Step struct {
@@ -80,6 +81,7 @@ type Step struct {
 	x1       float64 // Source Actor x
 	x2       float64 // Target Actor x
 	y        float64
+	height   int
 	sections []*section
 	noArrow  bool // true when Source or Target (not both) was left empty; text only, nothing drawn
 }
@@ -125,7 +127,9 @@ func (s *Sequence) SetHeight(height string) {
 	s.height = height
 }
 
-// SetStepHeight sets the height of each step in the sequence.
+// SetStepHeight sets the height for steps added after this call.
+//
+// It does not retroactively affect steps already added.
 func (s *Sequence) SetStepHeight(h int) {
 	s.stepHeight = h
 }
@@ -147,9 +151,7 @@ func (s *Sequence) AddActors(actors ...string) {
 			continue
 		}
 
-		if _, ok := s.actorsMap[a]; !ok {
-			s.actorsMap[a] = &actor{}
-		}
+		s.ensureActor(a)
 
 		if _, dup := seen[a]; !dup {
 			seen[a] = struct{}{}
@@ -171,8 +173,7 @@ func (s *Sequence) AddActors(actors ...string) {
 // if it does not, the actor is appended (thus appears the last).
 func (s *Sequence) AppendActors(actors ...string) {
 	for _, a := range actors {
-		if _, ok := s.actorsMap[a]; !ok {
-			s.actorsMap[a] = &actor{}
+		if s.ensureActor(a) {
 			s.actors = append(s.actors, a)
 		}
 	}
@@ -201,23 +202,18 @@ func (s *Sequence) AddStep(step Step) {
 	default:
 	}
 
-	// step.y is computed later in Generate(), once the final stepHeight is
-	// known; computing it here would go stale if SetStepHeight is called
-	// again before Generate().
+	step.height = s.stepHeight
+	if step.noArrow {
+		step.height /= 2
+	}
 
-	// associate step with all currently open sections; closed sections must
-	// not be touched, or a section closed with no steps of its own would get
-	// a firstStepIndex stamped in from a later, unrelated step.
+	// associate step with all currently open sections
 	for _, sec := range s.sections {
-		if sec.lastStepIndex != nil {
+		if sec.closed {
 			continue
 		}
 
-		if sec.firstStepIndex == nil {
-			idx := len(s.steps)
-			sec.firstStepIndex = &idx
-		}
-
+		sec.hasSteps = true
 		step.sections = append(step.sections, sec)
 	}
 
@@ -254,7 +250,6 @@ func (s *Sequence) OpenSection(name string, cfg *SectionConfig) {
 		name:     name,
 		color:    "#000000",
 		bordered: true,
-		height:   -10, // negative margin between steps so sections dont overlap
 	}
 
 	if cfg != nil {
@@ -272,9 +267,8 @@ func (s *Sequence) OpenSection(name string, cfg *SectionConfig) {
 // CloseSection closes the last open section, whether or not it has any step.
 func (s *Sequence) CloseSection() {
 	for _, sec := range slices.Backward(s.sections) {
-		if sec.lastStepIndex == nil {
-			idx := len(s.steps) - 1
-			sec.lastStepIndex = &idx
+		if !sec.closed {
+			sec.closed = true
 
 			return
 		}
@@ -285,16 +279,15 @@ func (s *Sequence) CloseSection() {
 // Use only if you cannot guarantee an open/close sequence for the sections.
 func (s *Sequence) CloseAllSections() {
 	for _, sec := range slices.Backward(s.sections) {
-		if sec.firstStepIndex != nil && sec.lastStepIndex == nil {
-			idx := len(s.steps) - 1
-			sec.lastStepIndex = &idx
+		if sec.hasSteps && !sec.closed {
+			sec.closed = true
 		}
 	}
 	// Delete incomplete sections
 	complete := []*section{}
 
 	for _, sec := range s.sections {
-		if sec.firstStepIndex != nil && sec.lastStepIndex != nil {
+		if sec.hasSteps && sec.closed {
 			complete = append(complete, sec)
 		}
 	}
@@ -341,19 +334,8 @@ func (s *Sequence) Generate() (string, error) {
 					},
 				},
 
-				marker{
-					ID: "seq-arrow", ViewBox: "0 0 10 10", MarkerWidth: 5, MarkerHeight: 5, RefX: 5, RefY: 5, Orient: "auto-start-reverse",
-					Elements: []any{
-						path{D: "M 0 0 L 10 5 L 0 10 z", Fill: "context-stroke"},
-					},
-				},
-
-				marker{
-					ID: "seq-arrow-sm", ViewBox: "0 0 10 10", MarkerWidth: 2.5, MarkerHeight: 2.5, RefX: 5, RefY: 5, Orient: "auto-start-reverse",
-					Elements: []any{
-						path{D: "M 0 0 L 10 5 L 0 10 z", Fill: "context-stroke"},
-					},
-				},
+				arrowMarker("seq-arrow", 5),
+				arrowMarker("seq-arrow-sm", 2.5),
 			},
 		})
 
@@ -383,61 +365,94 @@ func (s *Sequence) Generate() (string, error) {
 	// Compute steps and section values
 	stepY := float64(actorFontSize + 2)
 
+	var prevSections []*section
+
 	for _, st := range s.steps {
 		srcAct := s.actorsMap[st.Source]
 		tgtAct := s.actorsMap[st.Target]
 		st.x1 = srcAct.x
 		st.x2 = tgtAct.x
 
-		stHeight := s.getHeight(st)
+		stHeight := getHeight(st)
+
+		// the gap between two consecutive steps is always defined by the
+		// later step's own height.
+		// Compute it from stepY as it stands now, before any of the
+		// adjustments below, so it stays the natural midpoint regardless of
+		// what they do to stepY.
+		minSecY := max(0, stepY+float64(stHeight)/2.0)
+
+		// a step that opens a new section needs enough headroom above it for the section's label
+		if st.Text != "" {
+			for _, sec := range st.sections {
+				if slices.Contains(prevSections, sec) {
+					continue
+				}
+
+				extraLines := strings.Count(st.Text, "\n")
+				topmostOffset := float64(descriptionOffset) * float64(1+descriptionOffsetFactor*extraLines)
+
+				if needed := topmostOffset + sectionTopClearance; needed > float64(stHeight)/2.0 {
+					stepY += needed - float64(stHeight)/2.0
+				}
+
+				break
+			}
+		}
+
 		stepY += float64(stHeight)
 		st.y = stepY
 
-		minSecY := max(0, st.y-float64(stHeight)+float64(s.stepHeight)/2.0)
+		maxSecY := st.y + float64(stHeight)/2.0
 		minSecX := max(1.0, min(st.x1, st.x2)-float64(s.distance)/2.0)
 		maxSecX := max(st.x1, st.x2) + float64(s.distance)/2.0
 
-		for _, sec := range st.sections {
-			sec.height += stHeight
+		// a section open on the previous step but not on this one just closed
+		for _, sec := range prevSections {
+			if !slices.Contains(st.sections, sec) {
+				sec.yBottom = minSecY
+			}
+		}
 
-			if sec.y == 0 || sec.y > minSecY {
+		for _, sec := range st.sections {
+			if sec.y == 0 {
 				sec.y = minSecY
 			}
 
-			if sec.x == 0 || sec.x > minSecX {
-				sec.x = minSecX
-			}
+			// fallback bottom edge for a section that closes on the very
+			// last step, where there is no following step to refine it.
+			sec.yBottom = maxSecY
 
-			if sec.x2 == 0 || sec.x2 < maxSecX {
-				sec.x2 = maxSecX
-			}
-
-			sw := max(0, math.Abs(sec.x-sec.x2))
-			if sec.width < sw {
-				sec.width = sw
-			}
+			growMin(&sec.x, minSecX)
+			growMax(&sec.x2, maxSecX)
+			sec.width = max(sec.width, math.Abs(sec.x-sec.x2))
 		}
+
+		prevSections = st.sections
 	}
 
 	// Draw sections
 	for _, sec := range s.sections {
+		x, y, width := sec.x, sec.y, sec.width
+		height := int(sec.yBottom-sec.y) - sectionBottomMargin
+
 		if !s.verticalSectionText {
 			// Offset the sections to make space for horizontal labels
-			sec.height -= 4
-			sec.y += 2
-			sec.width -= 2
+			height -= 4
+			y += 2
+			width -= 2
 		}
 
 		var secText *text
 
 		if s.verticalSectionText {
-			labelX, labelY := sec.x-4, sec.y+float64(sec.height)/2.0
+			labelX, labelY := x-4, y+float64(height)/2.0
 			secText = &text{X: labelX, Y: labelY, Transform: fmt.Sprintf("rotate(-90,%d,%d)", int(labelX), int(labelY)), Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "middle", Content: sec.name}
 		} else {
-			secText = &text{X: sec.x, Y: sec.y - 2, Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "start", Content: sec.name}
+			secText = &text{X: x, Y: y - 2, Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "start", Content: sec.name}
 		}
 
-		secElem := rect{X: sec.x, Y: sec.y, Height: float64(sec.height), Width: float64(sec.width), Fill: sec.color, FillOpacity: 0.1}
+		secElem := rect{X: x, Y: y, Height: float64(height), Width: float64(width), Fill: sec.color, FillOpacity: 0.1}
 		if sec.bordered {
 			secElem.Stroke = sec.color
 			secElem.StrokeWidth = 1
@@ -481,6 +496,11 @@ func (s *Sequence) Generate() (string, error) {
 			parts := strings.Split(st.Text, "\n")
 			offset := float64(descriptionOffset)
 
+			// for text-only use half of the offset to move the text down a bit
+			if st.noArrow {
+				offset /= 2
+			}
+
 			// available horizontal space before a line risks overlapping neighboring lanes
 			maxWidth := max(float64(s.distance), math.Abs(st.x2-st.x1)) - 2*descriptionPadding
 
@@ -517,6 +537,43 @@ func (s *Sequence) Generate() (string, error) {
 	return sb.String(), nil
 }
 
+// ensureActor registers name in actorsMap if it isn't already there and
+// reports whether it was newly added.
+func (s *Sequence) ensureActor(name string) bool {
+	if _, ok := s.actorsMap[name]; ok {
+		return false
+	}
+
+	s.actorsMap[name] = &actor{}
+
+	return true
+}
+
+// growMin widens *cur downwards to v, treating the zero value as "unset".
+func growMin(cur *float64, v float64) {
+	if *cur == 0 || *cur > v {
+		*cur = v
+	}
+}
+
+// growMax widens *cur upwards to v, treating the zero value as "unset".
+func growMax(cur *float64, v float64) {
+	if *cur == 0 || *cur < v {
+		*cur = v
+	}
+}
+
+// arrowMarker builds a marker with an arrowhead of the given size; seq-arrow
+// and seq-arrow-sm only differ in size.
+func arrowMarker(id string, size float64) marker {
+	return marker{
+		ID: id, ViewBox: "0 0 10 10", MarkerWidth: size, MarkerHeight: size, RefX: 5, RefY: 5, Orient: "auto-start-reverse",
+		Elements: []any{
+			path{D: "M 0 0 L 10 5 L 0 10 z", Fill: "context-stroke"},
+		},
+	}
+}
+
 // truncateLine shortens a single line of step-description text so that it
 // roughly fits within maxWidth, appending an ellipsis when it does not fit.
 // It reports whether the line was truncated.
@@ -535,13 +592,13 @@ func truncateLine(line string, maxWidth float64) (string, bool) {
 	return string(runes[:maxChars-1]) + ellipsis, true
 }
 
-// getHeight returns the height of the step including the text description offset.
-func (s *Sequence) getHeight(st *Step) int {
-	height := s.stepHeight
-	incr := len(strings.Split(st.Text, "\n")) - 1
-	height += (descriptionOffset * descriptionOffsetFactor) * incr
+// getHeight returns the height of the step including the text description
+// offset. Keep the per-line increment in sync with the offset step used
+// when drawing description lines in Generate().
+func getHeight(st *Step) int {
+	extraLines := strings.Count(st.Text, "\n")
 
-	return height
+	return st.height + (descriptionOffset * descriptionOffsetFactor * extraLines)
 }
 
 // setup initializes the sequence.
@@ -557,7 +614,7 @@ func (s *Sequence) setup() error {
 	fullSections := []*section{}
 
 	for _, sec := range s.sections {
-		if sec.firstStepIndex != nil {
+		if sec.hasSteps {
 			fullSections = append(fullSections, sec)
 		}
 	}
@@ -566,7 +623,7 @@ func (s *Sequence) setup() error {
 
 	// Check that all sections have been closed
 	for _, sec := range s.sections {
-		if sec.lastStepIndex == nil {
+		if !sec.closed {
 			return fmt.Errorf("found open section: %s", sec.name)
 		}
 	}
@@ -583,10 +640,10 @@ func (s *Sequence) totalWidth() int {
 func (s *Sequence) totalHeight() int {
 	height := actorFontSize + 2
 	for _, st := range s.steps {
-		height += s.getHeight(st)
+		height += getHeight(st)
 	}
 
-	height += s.stepHeight / 2 // extra margin
+	height += s.steps[len(s.steps)-1].height / 2 // extra margin, matching the last step's own height
 	// ensure the height fits the dash-array so the sequence looks better
 	for height%dashArraySize != 0 {
 		height++
