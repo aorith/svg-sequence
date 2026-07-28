@@ -16,6 +16,7 @@ var test1 string
 
 func TestNewSequence(t *testing.T) {
 	s := svgsequence.NewSequence()
+	s.SetDistance(240)
 	s.OpenSection("Data", &svgsequence.SectionConfig{Color: "#998800"})
 	s.AddStep(svgsequence.Step{Source: "Data Owner", Target: "Data Owner", Text: "🔐 encrypt data using global key"})
 	s.AddStep(svgsequence.Step{Source: "Data Owner", Target: "Smart Contract", Text: "send encrypted data", Color: "#667777"})
@@ -29,7 +30,6 @@ func TestNewSequence(t *testing.T) {
 	s.AddStep(svgsequence.Step{Source: "Smart Contract", Target: "Engineer", Text: "send encrypted result"})
 	s.CloseSection()
 	s.AddStep(svgsequence.Step{Source: "Engineer", Target: "Engineer", Text: "🔓 decrypt using private key"})
-	s.SetDistance(240)
 
 	got, err := s.Generate()
 	if err != nil {
@@ -40,6 +40,44 @@ func TestNewSequence(t *testing.T) {
 	if got != want {
 		gotFn := "got_test.svg"
 		wantFn := "want_test.svg"
+		t.Errorf(`NewSequence() failed, resulting svg files saved as "%s" and "%s"`, gotFn, wantFn)
+		_ = os.WriteFile(gotFn, []byte(got), 0o644)
+		_ = os.WriteFile(wantFn, []byte(want), 0o644)
+	}
+}
+
+//go:embed tests/test2.svg
+var test2 string
+
+func TestNewSequence2(t *testing.T) {
+	s := svgsequence.NewSequence()
+	s.SetDistance(240)
+	s.SetWidth("1280px")
+	s.AddActors("Me", "Coworker", "Boss")
+	s.OpenSection("Work", &svgsequence.SectionConfig{Color: "#339922", WithoutBorder: false})
+	s.AddStep(svgsequence.Step{Source: "Me", Target: "Boss", Text: "click clack cluck"})
+	s.AddStep(svgsequence.Step{Source: "Me", Text: "zzZzz"})
+	s.AddStep(svgsequence.Step{Source: "Me", Text: "ZzZzz"})
+	s.AddStep(svgsequence.Step{Source: "Boss", Text: "<.<"})
+	s.AddStep(svgsequence.Step{Source: "Me", Text: "zzzZz"})
+	s.OpenSection("Dinner", &svgsequence.SectionConfig{Color: "#008899", WithoutBorder: false})
+	s.AddStep(svgsequence.Step{Source: "Coworker", Target: "Me", Text: "!!!?#"})
+	s.AddStep(svgsequence.Step{Source: "Me", Text: "ZzZzz"})
+	s.AddStep(svgsequence.Step{Source: "Me", Text: "O.o"})
+	s.CloseSection()
+	s.AddStep(svgsequence.Step{Source: "Coworker", Text: "O.o"})
+	s.AddStep(svgsequence.Step{Source: "Me", Target: "Coworker", Text: "Rdy!!"})
+	s.CloseSection()
+
+	got, err := s.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := test2
+	if got != want {
+		gotFn := "got_test2.svg"
+		wantFn := "want_test2.svg"
 		t.Errorf(`NewSequence() failed, resulting svg files saved as "%s" and "%s"`, gotFn, wantFn)
 		_ = os.WriteFile(gotFn, []byte(got), 0o644)
 		_ = os.WriteFile(wantFn, []byte(want), 0o644)
