@@ -53,17 +53,18 @@ type line struct {
 }
 
 type text struct {
-	XMLName    xml.Name `xml:"text"`
-	Class      string   `xml:"class,attr,omitempty"`
-	X          float64  `xml:"x,attr"`
-	Y          float64  `xml:"y,attr"`
-	Fill       string   `xml:"fill,attr,omitempty"`
-	Stroke     string   `xml:"stroke,attr,omitempty"`
-	FontSize   string   `xml:"font-size,attr,omitempty"`
-	TextAnchor string   `xml:"text-anchor,attr,omitempty"`
-	Transform  string   `xml:"transform,attr,omitempty"`
-	Title      *title   `xml:"title,omitempty"`
-	Content    string   `xml:",chardata"`
+	XMLName     xml.Name `xml:"text"`
+	Class       string   `xml:"class,attr,omitempty"`
+	X           float64  `xml:"x,attr"`
+	Y           float64  `xml:"y,attr"`
+	Fill        string   `xml:"fill,attr,omitempty"`
+	Stroke      string   `xml:"stroke,attr,omitempty"`
+	StrokeWidth int      `xml:"stroke-width,attr,omitempty"`
+	FontSize    string   `xml:"font-size,attr,omitempty"`
+	TextAnchor  string   `xml:"text-anchor,attr,omitempty"`
+	Transform   string   `xml:"transform,attr,omitempty"`
+	Title       *title   `xml:"title,omitempty"`
+	Content     string   `xml:",chardata"`
 }
 
 // title renders as a native SVG tooltip shown by the browser on mouse over.

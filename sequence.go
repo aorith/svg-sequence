@@ -17,26 +17,32 @@ import (
 var defaultCSS string
 
 const (
-	margin                  = 20                  // left and right margins
-	defaultDistance         = 180                 // default distance between actors
-	defaultStepHeight       = 50                  // default height for each step
-	actorFontSize           = 16                  // actor font size
-	dashArraySize           = 4                   // actor line stroke dash-array size
-	lifelineStrokeWidth     = 1                   // actor line stroke width
-	descriptionOffset       = 7                   // text description offset against the step line
-	descriptionOffsetFactor = 2                   // how much is increased the offset for each line in a multiline description
-	descriptionFontSize     = 10                  // step description font size
-	sectionFontSize         = descriptionFontSize // section label font size
-	monoCharWidthRatio      = 0.6                 // approx glyph width as a fraction of font-size for the monospace description font
-	descriptionPadding      = 10                  // horizontal padding kept clear on each side of a step description
-	ellipsis                = "…"                 // appended to a step description line truncated to fit
-	selfLoopRadiusX         = 9.0                 // how far a self-referencing step's loop bulges out from the lifeline
-	selfLoopRadiusY         = 6.0                 // half the vertical extent of a self-referencing step's loop
-	selfLoopStrokeWidth     = 1.5                 // stroke width of a self-referencing step's loop, thinner than a regular arrow
-	descClass               = "seq-desc"          // CSS class applied to every step description
-	descNoArrowClass        = "seq-desc-no-arrow" // additional CSS class applied to the description of a step with no arrow
-	sectionBottomMargin     = 10                  // vertical clearance trimmed from a section's bottom edge so consecutive sections don't visually touch
-	sectionTopClearance     = 10                  // minimum vertical room reserved between a section's label and its first member's own topmost text
+	defaultDistance   = 160 // default horizontal distance between actors
+	defaultStepHeight = 50  // default vertical space allotted to one step
+
+	leftMargin = 20 // outer canvas margin and the left x of section boxes
+	topMargin  = 28 // space reserved between actor text and first step
+
+	actorFontSize   = 20
+	descFontSize    = 12
+	sectionFontSize = 14
+
+	headerGap    = 10                        // gap between the actor label baseline and the lifeline start
+	headerHeight = actorFontSize + headerGap // y where lifelines/steps begin
+
+	lineHeight = descFontSize + 4 // vertical space per description text line
+	textGap    = 8                // gap between a step's arrow/mark and its nearest text baseline
+
+	selfLoopRX = 9 // self-loop arc horizontal radius
+	selfLoopRY = 6 // self-loop arc vertical radius
+
+	arrowMargin = 5 // arrow line margin towards the actor lifeline
+
+	sectionFirstStepMargin = 14 // margin between the section's top and the first step
+	sectionBottomMargin    = 10 // margin reserved below a section's last step
+	sectionLabelMargin     = 4  // margin between a section box's border and its label text
+
+	charWidthFactor = 0.6 // to adjust text against a fraction of descFontSize
 )
 
 type actor struct {
@@ -48,11 +54,11 @@ type section struct {
 	color    string
 	bordered bool
 	link     string
-	hasSteps bool // true once at least one step has been associated with the section
-	closed   bool // true once CloseSection/CloseAllSections has closed the section
+	hasSteps bool
+	closed   bool
 
 	x, x2, y, yBottom float64
-	width             float64
+	lastMemberY       float64 // y of the last step associated with this section
 }
 
 type Step struct {
@@ -83,7 +89,7 @@ type Step struct {
 	y        float64
 	height   int
 	sections []*section
-	noArrow  bool // true when Source or Target (not both) was left empty; text only, nothing drawn
+	noArrow  bool // true when Source or Target (not both) was left empty
 }
 
 type Sequence struct {
@@ -232,7 +238,7 @@ func (s *Sequence) AddStep(step Step) {
 type SectionConfig struct {
 	Color         string // Optional CSS color value (e.g., " #ff0000", "red").
 	WithoutBorder bool   // Section is drawn without a border.
-	Link          string // Optional URL/fragment; wraps the section's label in an <a href="...">.
+	Link          string // Optional URL/fragment for the section label
 }
 
 // OpenSection opens a new section to the sequence diagram.
@@ -297,244 +303,336 @@ func (s *Sequence) CloseAllSections() {
 
 // Generate generates a new SVG sequence.
 func (s *Sequence) Generate() (string, error) {
-	if len(s.actors) == 0 {
-		return "", errors.New("sequence has no actors")
-	}
-
-	if len(s.steps) == 0 {
-		return "", errors.New("sequence has no steps")
-	}
-
-	err := s.setup()
+	err := s.validate()
 	if err != nil {
 		return "", err
 	}
 
-	totalWidth := s.totalWidth()
-	totalHeight := s.totalHeight()
+	totalWidth, totalHeight := s.layout()
+
+	elements := make([]any, 0, 2+len(s.actors)*2+len(s.sections)*2+len(s.steps)*2)
+	elements = append(elements, buildDefs())
+	elements = append(elements, rect{X: 0, Y: 0, Width: totalWidth, Height: totalHeight, Fill: "#FFFFFF"})
+	elements = append(elements, s.buildActors(totalHeight)...)
+	elements = append(elements, s.buildSections()...)
+	elements = append(elements, s.buildSteps()...)
 
 	root := svg{
-		Xmlns:               "http://www.w3.org/2000/svg", // nolint: revive
+		Xmlns:               "http://www.w3.org/2000/svg", // nolint:revive
 		Width:               s.width,
 		Height:              s.height,
-		ViewBox:             fmt.Sprintf("0 0 %d %d", totalWidth, totalHeight),
+		ViewBox:             fmt.Sprintf("0 0 %s %s", fmtNum(totalWidth), fmtNum(totalHeight)),
 		PreserveAspectRatio: "xMinYMin meet",
+		Elements:            elements,
 	}
 
-	// Definitions
-	root.Elements = append(root.Elements,
-		svgDefs{
-			Elements: []any{
-				svgStyle{Content: defaultCSS},
-
-				marker{
-					ID: "seq-dot", ViewBox: "0 0 10 10", MarkerWidth: 5, MarkerHeight: 5, RefX: 5, RefY: 5,
-					Elements: []any{
-						circle{CX: 5, CY: 5, R: 3, Fill: "context-stroke"},
-					},
-				},
-
-				arrowMarker("seq-arrow", 5),
-				arrowMarker("seq-arrow-sm", 2.5),
-			},
-		})
-
-	// Background
-	root.Elements = append(root.Elements,
-		rect{X: 0, Y: 0, Width: float64(totalWidth), Height: float64(totalHeight), Fill: "#FFFFFF"},
-	)
-
-	// Draw actors
-	x := margin + s.distance/2
-	y := actorFontSize + 2
-
-	for _, name := range s.actors {
-		a := s.actorsMap[name]
-
-		root.Elements = append(root.Elements,
-			// Actor line
-			line{X1: float64(x), Y1: float64(y + dashArraySize), X2: float64(x), Y2: float64(totalHeight), Stroke: "#CCCCCC", StrokeDasharray: fmt.Sprintf("%[1]d %[1]d", dashArraySize), StrokeWidth: lifelineStrokeWidth},
-			// Actor text
-			text{X: float64(x), Y: float64(y), FontSize: strconv.Itoa(actorFontSize), Stroke: "none", Fill: "#000000", TextAnchor: "middle", Content: name},
-		)
-
-		a.x = float64(x)
-		x += s.distance
+	data, err := xml.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return "", err
 	}
 
-	// Compute steps and section values
-	stepY := float64(actorFontSize + 2)
+	return string(data), nil
+}
+
+// validate drops sections that never received a step, checks that every
+// remaining section was closed, and ensures there's at least one actor and
+// one step to draw.
+func (s *Sequence) validate() error {
+	complete := make([]*section, 0, len(s.sections))
+
+	for _, sec := range s.sections {
+		if !sec.hasSteps {
+			continue
+		}
+
+		if !sec.closed {
+			return fmt.Errorf("section %q was not closed", sec.name)
+		}
+
+		complete = append(complete, sec)
+	}
+
+	s.sections = complete
+
+	if len(s.actors) == 0 {
+		return errors.New("sequence has no actors")
+	}
+
+	if len(s.steps) == 0 {
+		return errors.New("sequence has no steps")
+	}
+
+	if s.stepHeight < 10 {
+		return errors.New("min step height is 10")
+	}
+
+	if s.distance < 50 {
+		return errors.New("min actor distance is 50")
+	}
+
+	return nil
+}
+
+// layout assigns every position for the drawn objects and returns
+// the total canvas size (width, height).
+func (s *Sequence) layout() (float64, float64) {
+	distance := float64(s.distance)
+	totalWidth := 2*leftMargin + float64(len(s.actors))*distance
+
+	for i, name := range s.actors {
+		s.actorsMap[name].x = leftMargin + distance/2 + float64(i)*distance
+	}
+
+	for _, step := range s.steps {
+		step.x1 = s.actorsMap[step.Source].x
+		step.x2 = s.actorsMap[step.Target].x
+	}
+
+	cursor := float64(headerHeight + topMargin)
+	started := make(map[*section]bool, len(s.sections))
 
 	var prevSections []*section
 
-	for _, st := range s.steps {
-		srcAct := s.actorsMap[st.Source]
-		tgtAct := s.actorsMap[st.Target]
-		st.x1 = srcAct.x
-		st.x2 = tgtAct.x
-
-		stHeight := getHeight(st)
-
-		// the gap between two consecutive steps is always defined by the
-		// later step's own height.
-		// Compute it from stepY as it stands now, before any of the
-		// adjustments below, so it stays the natural midpoint regardless of
-		// what they do to stepY.
-		minSecY := max(0, stepY+float64(stHeight)/2.0)
-
-		// a step that opens a new section needs enough headroom above it for the section's label
-		if st.Text != "" {
-			for _, sec := range st.sections {
-				if slices.Contains(prevSections, sec) {
-					continue
-				}
-
-				extraLines := strings.Count(st.Text, "\n")
-				topmostOffset := float64(descriptionOffset) * float64(1+descriptionOffsetFactor*extraLines)
-
-				if needed := topmostOffset + sectionTopClearance; needed > float64(stHeight)/2.0 {
-					stepY += needed - float64(stHeight)/2.0
-				}
+	for _, step := range s.steps {
+		for _, sec := range prevSections {
+			if !slices.Contains(step.sections, sec) {
+				cursor += sectionBottomMargin
 
 				break
 			}
 		}
 
-		stepY += float64(stHeight)
-		st.y = stepY
+		prevSections = step.sections
 
-		maxSecY := st.y + float64(stHeight)/2.0
-		minSecX := max(1.0, min(st.x1, st.x2)-float64(s.distance)/2.0)
-		maxSecX := max(st.x1, st.x2) + float64(s.distance)/2.0
+		lines := strings.Split(step.Text, "\n")
+		textSpan := textGap + float64(len(lines)-1)*lineHeight
+		minHalf := textSpan + textGap
 
-		// a section open on the previous step but not on this one just closed
-		for _, sec := range prevSections {
-			if !slices.Contains(st.sections, sec) {
-				sec.yBottom = minSecY
+		opensSection := false
+
+		for _, sec := range step.sections {
+			lo, hi := stepXBounds(step.x1, step.x2, distance, totalWidth)
+
+			if started[sec] {
+				sec.x = math.Min(sec.x, lo)
+				sec.x2 = math.Max(sec.x2, hi)
+
+				continue
 			}
+
+			started[sec] = true
+			sec.x, sec.x2 = lo, hi
+			sec.y = cursor
+			opensSection = true
 		}
 
-		for _, sec := range st.sections {
-			if sec.y == 0 {
-				sec.y = minSecY
-			}
-
-			// fallback bottom edge for a section that closes on the very
-			// last step, where there is no following step to refine it.
-			sec.yBottom = maxSecY
-
-			growMin(&sec.x, minSecX)
-			growMax(&sec.x2, maxSecX)
-			sec.width = max(sec.width, math.Abs(sec.x-sec.x2))
+		if opensSection {
+			cursor += sectionFirstStepMargin
 		}
 
-		prevSections = st.sections
+		effectiveHeight := math.Max(float64(step.height), 2*minHalf)
+		step.y = cursor + effectiveHeight/2
+
+		for _, sec := range step.sections {
+			sec.yBottom = cursor + effectiveHeight
+			sec.lastMemberY = step.y
+		}
+
+		cursor += effectiveHeight
 	}
 
-	// Draw sections
-	for _, sec := range s.sections {
-		x, y, width := sec.x, sec.y, sec.width
-		height := int(sec.yBottom-sec.y) - sectionBottomMargin
+	return totalWidth, cursor
+}
 
-		if !s.verticalSectionText {
-			// Offset the sections to make space for horizontal labels
-			height -= 4
-			y += 2
-			width -= 2
+// stepXBounds returns a section's horizontal extent.
+func stepXBounds(x1, x2, distance, totalWidth float64) (float64, float64) {
+	lo := math.Min(x1, x2) - distance/2
+	hi := math.Max(x1, x2) + distance/2
+
+	if lo < leftMargin {
+		lo = leftMargin
+	}
+
+	if hi > totalWidth-leftMargin {
+		hi = totalWidth - leftMargin
+	}
+
+	return lo, hi
+}
+
+// buildDefs returns the <defs> element: the embedded stylesheet and the
+// dot/arrowhead markers reused by every step.
+func buildDefs() svgDefs {
+	arrowPath := path{D: "M 0 0 L 10 5 L 0 10 z", Fill: "context-stroke"}
+
+	return svgDefs{
+		Elements: []any{
+			svgStyle{Content: defaultCSS},
+			marker{
+				ID: "seq-dot", ViewBox: "0 0 10 10", MarkerWidth: 5, MarkerHeight: 5, RefX: 5, RefY: 5,
+				Elements: []any{circle{CX: 5, CY: 5, R: 3, Fill: "context-stroke"}},
+			},
+			marker{
+				ID: "seq-arrow", ViewBox: "0 0 10 10", MarkerWidth: 5, MarkerHeight: 5, RefX: 5, RefY: 5,
+				Orient: "auto-start-reverse", Elements: []any{arrowPath},
+			},
+			marker{
+				ID: "seq-arrow-sm", ViewBox: "0 0 10 10", MarkerWidth: 2.5, MarkerHeight: 2.5, RefX: 5, RefY: 5,
+				Orient: "auto-start-reverse", Elements: []any{arrowPath},
+			},
+		},
+	}
+}
+
+// buildActors draws every actor's dashed lifeline and its centered label.
+func (s *Sequence) buildActors(totalHeight float64) []any {
+	elements := make([]any, 0, len(s.actors)*2)
+
+	for _, name := range s.actors {
+		x := s.actorsMap[name].x
+
+		elements = append(elements,
+			line{X1: x, Y1: headerHeight, X2: x, Y2: totalHeight, Stroke: "#CCCCCC", StrokeWidth: 1, StrokeDasharray: "4 4"},
+			text{
+				X: x, Y: headerHeight - 4, Fill: "#000000", Stroke: "#999999", StrokeWidth: 1,
+				FontSize: strconv.Itoa(actorFontSize), TextAnchor: "middle", Content: name,
+			},
+		)
+	}
+
+	return elements
+}
+
+// buildSections draws every section's box and its label.
+func (s *Sequence) buildSections() []any {
+	elements := make([]any, 0, len(s.sections)*2)
+
+	for _, sec := range s.sections {
+		top := sec.y
+
+		bottom := math.Max(sec.yBottom-sectionBottomMargin, sec.lastMemberY)
+
+		r := rect{X: sec.x, Y: top, Width: sec.x2 - sec.x, Height: bottom - top, Fill: sec.color, FillOpacity: 0.1}
+		if sec.bordered {
+			r.Stroke = sec.color
+			r.StrokeWidth = 1
 		}
 
-		var secText *text
+		elements = append(elements, r)
+
+		label := text{Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), Content: sec.name}
 
 		if s.verticalSectionText {
-			labelX, labelY := x-4, y+float64(height)/2.0
-			secText = &text{X: labelX, Y: labelY, Transform: fmt.Sprintf("rotate(-90,%d,%d)", int(labelX), int(labelY)), Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "middle", Content: sec.name}
+			label.X = sec.x - sectionLabelMargin
+			label.Y = sec.y + sectionLabelMargin
+			label.TextAnchor = "end"
+			label.Transform = fmt.Sprintf("rotate(-90 %s %s)", fmtNum(label.X), fmtNum(label.Y))
 		} else {
-			secText = &text{X: x, Y: y - 2, Fill: sec.color, Stroke: "none", FontSize: strconv.Itoa(sectionFontSize), TextAnchor: "start", Content: sec.name}
-		}
-
-		secElem := rect{X: x, Y: y, Height: float64(height), Width: float64(width), Fill: sec.color, FillOpacity: 0.1}
-		if sec.bordered {
-			secElem.Stroke = sec.color
-			secElem.StrokeWidth = 1
+			label.X = sec.x
+			label.Y = sec.y - sectionLabelMargin
+			label.TextAnchor = "start"
 		}
 
 		if sec.link != "" {
-			root.Elements = append(root.Elements, secElem, anchor{Href: sec.link, Elements: []any{*secText}})
+			elements = append(elements, anchor{Href: sec.link, Elements: []any{label}})
 		} else {
-			root.Elements = append(root.Elements, secElem, *secText)
+			elements = append(elements, label)
 		}
 	}
 
-	// Draw steps
-	var x2 float64
+	return elements
+}
 
-	for _, st := range s.steps {
+// buildSteps draws every step's arrow/mark (if any) and its description text.
+func (s *Sequence) buildSteps() []any {
+	distance := float64(s.distance)
+	elements := make([]any, 0, len(s.steps)*2)
+
+	for _, step := range s.steps {
 		switch {
-		case st.noArrow:
-			// only one of Source/Target was given: no arrow or loop, text only
-		case st.x1 == st.x2:
-			// self-referencing step
-			d := fmt.Sprintf("M %g %g A %g %g 0 1 1 %g %g",
-				st.x1, st.y, selfLoopRadiusX, selfLoopRadiusY, st.x1, st.y+2*selfLoopRadiusY)
-			root.Elements = append(root.Elements,
-				path{D: d, Fill: "none", Stroke: st.Color, StrokeWidth: selfLoopStrokeWidth, MarkerEnd: "url(#seq-arrow-sm)"},
+		case step.noArrow:
+			elements = append(elements, stepText(step, distance-2*textGap)...)
+
+		case step.Source == step.Target:
+			d := fmt.Sprintf("M %s %s A %d %d 0 1 1 %s %s",
+				fmtNum(step.x1), fmtNum(step.y), selfLoopRX, selfLoopRY, fmtNum(step.x1), fmtNum(step.y+2*selfLoopRY))
+
+			elements = append(elements,
+				path{D: d, Fill: "none", Stroke: step.Color, StrokeWidth: 1.5, MarkerEnd: "url(#seq-arrow-sm)"},
 			)
+			elements = append(elements, stepText(step, distance-2*textGap)...)
+
 		default:
-			if st.x1 < st.x2 {
-				x2 = st.x2 - 5
+			x2 := step.x2
+			if step.x2 > step.x1 {
+				x2 -= arrowMargin
 			} else {
-				x2 = st.x2 + 5
+				x2 += arrowMargin
 			}
-			// arrow
-			root.Elements = append(root.Elements,
-				line{X1: st.x1, Y1: st.y, X2: x2, Y2: st.y, Stroke: st.Color, StrokeWidth: 2, MarkerStart: "url(#seq-dot)", MarkerEnd: "url(#seq-arrow)"},
+
+			elements = append(elements,
+				line{
+					X1: step.x1, Y1: step.y, X2: x2, Y2: step.y,
+					Stroke: step.Color, StrokeWidth: 2,
+					MarkerStart: "url(#seq-dot)", MarkerEnd: "url(#seq-arrow)",
+				},
 			)
-		}
-
-		// description
-		if st.Text != "" {
-			parts := strings.Split(st.Text, "\n")
-			offset := float64(descriptionOffset)
-
-			// for text-only use half of the offset to move the text down a bit
-			if st.noArrow {
-				offset /= 2
-			}
-
-			// available horizontal space before a line risks overlapping neighboring lanes
-			maxWidth := max(float64(s.distance), math.Abs(st.x2-st.x1)) - 2*descriptionPadding
-
-			class := descClass
-			if st.noArrow {
-				class += " " + descNoArrowClass
-			}
-
-			for _, p := range slices.Backward(parts) {
-				line, truncated := truncateLine(p, maxWidth)
-
-				t := text{Class: class, X: float64(st.x1+st.x2) / 2, Y: st.y - offset, Fill: st.Color, Stroke: "none", FontSize: strconv.Itoa(descriptionFontSize), TextAnchor: "middle", Content: line}
-				if truncated {
-					// full, untruncated text (newlines included) shown as a native tooltip on mouse over
-					t.Title = &title{Content: st.Text}
-				}
-
-				root.Elements = append(root.Elements, t)
-				offset += descriptionOffset * descriptionOffsetFactor
-			}
+			elements = append(elements, stepText(step, math.Abs(step.x2-step.x1)-4*textGap)...)
 		}
 	}
 
-	var sb strings.Builder
+	return elements
+}
 
-	encoder := xml.NewEncoder(&sb)
-	encoder.Indent("", "  ")
-
-	err = encoder.Encode(root)
-	if err != nil {
-		return "", err
+// stepText renders a step's description.
+func stepText(step *Step, availWidth float64) []any {
+	class := "seq-desc"
+	if step.noArrow {
+		class = "seq-desc seq-desc-no-arrow"
 	}
 
-	return sb.String(), nil
+	lines := strings.Split(step.Text, "\n")
+	elements := make([]any, 0, len(lines))
+
+	for i, line := range lines {
+		rendered, cut := truncateLine(line, availWidth)
+
+		t := text{
+			Class: class, X: (step.x1 + step.x2) / 2, Y: step.y - textGap - float64(len(lines)-1-i)*lineHeight,
+			Fill: step.Color, Stroke: "none", FontSize: strconv.Itoa(descFontSize), TextAnchor: "middle",
+			Content: rendered,
+		}
+
+		if cut {
+			t.Title = &title{Content: step.Text}
+		}
+
+		elements = append(elements, t)
+	}
+
+	return elements
+}
+
+// truncateLine shortens line to fit availWidth.
+func truncateLine(line string, availWidth float64) (string, bool) {
+	charWidth := descFontSize * charWidthFactor
+	maxChars := max(int(availWidth/charWidth), 1)
+
+	runes := []rune(line)
+	if len(runes) <= maxChars {
+		return line, false
+	}
+
+	if maxChars == 1 {
+		return "…", true
+	}
+
+	return string(runes[:maxChars-1]) + "…", true
+}
+
+// fmtNum formats a coordinate without a trailing ".0" for whole numbers.
+func fmtNum(f float64) string {
+	return strconv.FormatFloat(f, 'f', -1, 64)
 }
 
 // ensureActor registers name in actorsMap if it isn't already there and
@@ -547,107 +645,4 @@ func (s *Sequence) ensureActor(name string) bool {
 	s.actorsMap[name] = &actor{}
 
 	return true
-}
-
-// growMin widens *cur downwards to v, treating the zero value as "unset".
-func growMin(cur *float64, v float64) {
-	if *cur == 0 || *cur > v {
-		*cur = v
-	}
-}
-
-// growMax widens *cur upwards to v, treating the zero value as "unset".
-func growMax(cur *float64, v float64) {
-	if *cur == 0 || *cur < v {
-		*cur = v
-	}
-}
-
-// arrowMarker builds a marker with an arrowhead of the given size; seq-arrow
-// and seq-arrow-sm only differ in size.
-func arrowMarker(id string, size float64) marker {
-	return marker{
-		ID: id, ViewBox: "0 0 10 10", MarkerWidth: size, MarkerHeight: size, RefX: 5, RefY: 5, Orient: "auto-start-reverse",
-		Elements: []any{
-			path{D: "M 0 0 L 10 5 L 0 10 z", Fill: "context-stroke"},
-		},
-	}
-}
-
-// truncateLine shortens a single line of step-description text so that it
-// roughly fits within maxWidth, appending an ellipsis when it does not fit.
-// It reports whether the line was truncated.
-func truncateLine(line string, maxWidth float64) (string, bool) {
-	maxChars := max(int(maxWidth/(descriptionFontSize*monoCharWidthRatio)), 1)
-
-	runes := []rune(line)
-	if len(runes) <= maxChars {
-		return line, false
-	}
-
-	if maxChars == 1 {
-		return ellipsis, true
-	}
-
-	return string(runes[:maxChars-1]) + ellipsis, true
-}
-
-// getHeight returns the height of the step including the text description
-// offset. Keep the per-line increment in sync with the offset step used
-// when drawing description lines in Generate().
-func getHeight(st *Step) int {
-	extraLines := strings.Count(st.Text, "\n")
-
-	return st.height + (descriptionOffset * descriptionOffsetFactor * extraLines)
-}
-
-// setup initializes the sequence.
-func (s *Sequence) setup() error {
-	// Check that all steps defined the actors
-	for i, step := range s.steps {
-		if step.Source == "" || step.Target == "" {
-			return fmt.Errorf("step #%d defined an actor with an empty name", i+1)
-		}
-	}
-
-	// Delete empty sections
-	fullSections := []*section{}
-
-	for _, sec := range s.sections {
-		if sec.hasSteps {
-			fullSections = append(fullSections, sec)
-		}
-	}
-
-	s.sections = fullSections
-
-	// Check that all sections have been closed
-	for _, sec := range s.sections {
-		if !sec.closed {
-			return fmt.Errorf("found open section: %s", sec.name)
-		}
-	}
-
-	return nil
-}
-
-// totalWidth returns the total width of the SVG.
-func (s *Sequence) totalWidth() int {
-	return margin*2 + s.distance*len(s.actorsMap)
-}
-
-// totalHeight returns the total height of the SVG.
-func (s *Sequence) totalHeight() int {
-	height := actorFontSize + 2
-	for _, st := range s.steps {
-		height += getHeight(st)
-	}
-
-	height += s.steps[len(s.steps)-1].height / 2 // extra margin, matching the last step's own height
-	// ensure the height fits the dash-array so the sequence looks better
-	for height%dashArraySize != 0 {
-		height++
-	}
-
-	return height
 }

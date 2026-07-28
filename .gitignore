@@ -13,4 +13,4 @@ go.work.sum
 .vscode/
 
 # Failed test files
-*_test.svg
+*_test*.svg

@@ -1,11 +1,11 @@
 text {
-  font-family: "helvetica neue", arial, sans-serif, system-ui;
+    font-family: 'Segoe UI', Roboto, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 text.seq-desc {
-  font-family: "Meslo", "JetBrains Mono", "Hack", "Menlo", monospace;
+    font-family: SFMono-Regular, Menlo, Consolas, Monaco, "Liberation Mono", "Lucida Console", monospace;
 }
 
 text.seq-desc-no-arrow {
-  font-style: italic;
+    font-style: italic;
 }
