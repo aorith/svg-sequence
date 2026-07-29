@@ -494,7 +494,7 @@ func (s *Sequence) buildActors(totalHeight float64) []any {
 		elements = append(elements,
 			line{X1: x, Y1: headerHeight, X2: x, Y2: totalHeight, Stroke: "#CCCCCC", StrokeWidth: 1, StrokeDasharray: "4 4"},
 			text{
-				X: x, Y: headerHeight - 4, Fill: "#000000", Stroke: "#999999", StrokeWidth: 1,
+				X: x, Y: headerHeight - 4, Fill: "#000000",
 				FontSize: strconv.Itoa(actorFontSize), TextAnchor: "middle", Content: name,
 			},
 		)

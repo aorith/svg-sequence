@@ -13,13 +13,13 @@
   </defs>
   <rect x="0" y="0" width="760" height="490" fill="#FFFFFF"></rect>
   <line x1="110" y1="30" x2="110" y2="490" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4 4"></line>
-  <text x="110" y="26" fill="#000000" stroke="#999999" stroke-width="1" font-size="20" text-anchor="middle">Client</text>
+  <text x="110" y="26" fill="#000000" font-size="20" text-anchor="middle">Client</text>
   <line x1="290" y1="30" x2="290" y2="490" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4 4"></line>
-  <text x="290" y="26" fill="#000000" stroke="#999999" stroke-width="1" font-size="20" text-anchor="middle">Varnish</text>
+  <text x="290" y="26" fill="#000000" font-size="20" text-anchor="middle">Varnish</text>
   <line x1="470" y1="30" x2="470" y2="490" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4 4"></line>
-  <text x="470" y="26" fill="#000000" stroke="#999999" stroke-width="1" font-size="20" text-anchor="middle">Cache</text>
+  <text x="470" y="26" fill="#000000" font-size="20" text-anchor="middle">Cache</text>
   <line x1="650" y1="30" x2="650" y2="490" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4 4"></line>
-  <text x="650" y="26" fill="#000000" stroke="#999999" stroke-width="1" font-size="20" text-anchor="middle">Backend</text>
+  <text x="650" y="26" fill="#000000" font-size="20" text-anchor="middle">Backend</text>
   <rect x="20" y="58" width="540" height="182" fill="#AAAA00" fill-opacity="0.1" stroke="#AAAA00" stroke-width="1"></rect>
   <text x="16" y="62" fill="#AAAA00" stroke="none" font-size="14" text-anchor="end" transform="rotate(-90 16 62)">Request</text>
   <rect x="200" y="260" width="540" height="132" fill="#990033" fill-opacity="0.1" stroke="#990033" stroke-width="1"></rect>
